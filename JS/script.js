@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const pageId = document.body.id;
 
-    // --- LÓGICA PARA PÁGINA "INICIO" ---
+    // --- LÓGICA PARA PÁGINA "INICIO" (CARRUSEL) ---
     let slideIndex = 0;
     const slides = document.querySelectorAll('.slide');
     if (slides.length > 0) {
@@ -45,6 +45,16 @@ document.addEventListener('DOMContentLoaded', () => {
             slides[slideIndex - 1].classList.add('active');
             setTimeout(showSlides, 5000);
         }
+    }
+    
+    // --- LÓGICA PARA EL MENÚ MÓVIL ---
+    const hamburger = document.querySelector('.hamburger-menu');
+    const mobileNav = document.querySelector('.mobile-nav');
+
+    if (hamburger && mobileNav) {
+        hamburger.addEventListener('click', () => {
+            mobileNav.classList.toggle('active');
+        });
     }
 
     // --- LÓGICA PARA PÁGINA "PEDIDOS" ---
@@ -196,7 +206,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     localStorage.removeItem('polcarfer_cart');
                     alert('¡Lista de precios actualizada con éxito! La página se recargará.');
                     window.location.reload();
-
                 } catch (error) {
                     console.error("Error al leer el archivo Excel:", error);
                     alert("Hubo un error al procesar el archivo.");

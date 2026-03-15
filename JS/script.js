@@ -67,7 +67,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'product-card';
             const imageUrl = producto.imagen || generatePlaceholder('Sin Imagen');
-            card.innerHTML = `<img src="${imageUrl}" alt="${producto.nombre}" onerror="this.onerror=null; this.src='${generatePlaceholder(producto.nombre)}';"><h3>${producto.nombre}</h3><p class="price">$${(producto.precio || 0).toLocaleString('es-AR')}</p><button class="btn add-to-cart" data-codigo="${producto.codigo}">Agregar al Carrito</button>`;
+            card.innerHTML = `
+                <img src="${imageUrl}" alt="${producto.nombre}" onerror="this.onerror=null; this.src='${generatePlaceholder(producto.nombre)}';">
+                <div class="product-card-content">
+                    <h3>${producto.nombre}</h3>
+                    <p class="price">$${(producto.precio || 0).toLocaleString('es-AR')}</p>
+                    <button class="btn add-to-cart" data-codigo="${producto.codigo}">Agregar al Carrito</button>
+                </div>
+            `;
             productGrid.appendChild(card);
         });
         

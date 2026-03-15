@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pedidos - POLCARFER SRL</title>
+    <title>Catálogo de Pedidos - POLCARFER SRL</title>
     <link rel="stylesheet" href="CSS/styles.css">
 </head>
-<body id="page-pedidos"> <!-- ID para que el JS sepa qué página es -->
+<body id="page-pedidos">
 
     <header>
         <div class="container">
             <a href="index.html" class="logo">POLCARFER SRL</a>
-            <nav>
+            
+            <nav class="desktop-nav">
                 <ul>
                     <li><a href="index.html">Inicio</a></li>
                     <li><a href="quienes-somos.html">¿Quiénes Somos?</a></li>
@@ -20,38 +21,43 @@
                     <li><a href="contacto.html">Contacto</a></li>
                 </ul>
             </nav>
+
             <div class="cart-icon-container">
                 <img src="https://img.icons8.com/ios-filled/50/FFC107/shopping-cart.png" alt="Carrito" id="cart-icon"/>
                 <span id="cart-count">0</span>
             </div>
+
+            <button class="hamburger-menu">
+                <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            </button>
+
+            <nav class="mobile-nav">
+                <ul>
+                    <li><a href="index.html">Inicio</a></li>
+                    <li><a href="quienes-somos.html">¿Quiénes Somos?</a></li>
+                    <li><a href="pedidos.html">Pedidos</a></li>
+                    <li><a href="lista-precios.html">Lista de Precios</a></li>
+                    <li><a href="contacto.html">Contacto</a></li>
+                </ul>
+            </nav>
         </div>
     </header>
 
     <main class="container page-content">
         <h1>Catálogo de Productos</h1>
         <p>Selecciona los productos que deseas y agrégalos a tu carrito.</p>
-        
         <div id="product-grid" class="product-grid"></div>
     </main>
     
-    <!-- Modal del Carrito (inicialmente oculto) -->
     <div id="cart-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
             <h2>Tu Carrito de Compras</h2>
-            <div id="cart-items">
-                <!-- Los items del carrito se cargarán aquí -->
-                <p>Tu carrito está vacío.</p>
-            </div>
+            <div id="cart-items"><p>Tu carrito está vacío.</p></div>
             <div id="cart-summary">
                 <h3>Total: <span id="cart-total">$0.00</span></h3>
-                
-                <!-- COMENTARIO: REEMPLAZA ESTA URL por tu link de pago de Mercado Pago -->
                 <a href="https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=TU_PREFERENCE_ID" target="_blank" class="btn btn-primary" id="checkout-btn">Finalizar Compra y Pagar</a>
-                
-                <!-- BOTÓN NUEVO: Para vaciar el carrito -->
                 <button id="empty-cart-btn" class="btn btn-secondary">Vaciar Carrito</button>
-                
                 <small>Serás redirigido a Mercado Pago para completar la compra de forma segura.</small>
             </div>
         </div>

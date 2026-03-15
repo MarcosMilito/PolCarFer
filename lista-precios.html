@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista de Precios - POLCARFER SRL</title>
+    <title>Administración de Precios - POLCARFER SRL</title>
     <link rel="stylesheet" href="CSS/styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -11,64 +11,50 @@
 
     <header>
         <div class="container">
-            <a href="index.html" class="logo">POLCARFER SRL</a>
-            
-            <nav class="desktop-nav">
-                <ul>
-                    <li><a href="index.html">Inicio</a></li>
-                    <li><a href="quienes-somos.html">¿Quiénes Somos?</a></li>
-                    <li><a href="pedidos.html">Pedidos</a></li>
-                    <li><a href="lista-precios.html" class="active">Lista de Precios</a></li>
-                    <li><a href="contacto.html">Contacto</a></li>
-                </ul>
-            </nav>
-
-            <button class="hamburger-menu">
-                <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-            </button>
-
-            <nav class="mobile-nav">
-                <ul>
-                    <li><a href="index.html">Inicio</a></li>
-                    <li><a href="quienes-somos.html">¿Quiénes Somos?</a></li>
-                    <li><a href="pedidos.html">Pedidos</a></li>
-                    <li><a href="lista-precios.html">Lista de Precios</a></li>
-                    <li><a href="contacto.html">Contacto</a></li>
-                </ul>
-            </nav>
+            <a href="index.html" class="logo">POLCARFER SRL - Panel de Administración</a>
         </div>
     </header>
 
     <main class="container page-content">
-        <h1>Lista de Precios General</h1>
-        
-        <div class="admin-section">
-            <h2>Actualizar Lista (Solo Propietarios)</h2>
-            <p>Selecciona un archivo Excel (.xlsx) para cargar y visualizar los productos en la tabla de abajo.</p>
-            <input type="file" id="excel-file" accept=".xlsx, .xls">
-            <button id="upload-btn" class="btn">Cargar Archivo</button>
+        <!-- Formulario de Login para Socios -->
+        <div id="login-section" class="admin-section">
+            <h2>Acceso para Socios</h2>
+            <p>Ingresa la contraseña para modificar la lista de precios.</p>
+            <form id="login-form">
+                <div class="form-group">
+                    <input type="password" id="password-input" placeholder="Contraseña de socio" required>
+                </div>
+                <button type="submit" class="btn">Acceder</button>
+            </form>
         </div>
 
+        <!-- Panel de admin oculto por defecto -->
+        <div id="admin-panel" class="admin-section" style="display: none;">
+            <h1>Actualizar Lista de Precios</h1>
+            <p>Selecciona un archivo Excel (.xlsx) para actualizar el catálogo para todos los usuarios. El cambio será inmediato.</p>
+            <input type="file" id="excel-file" accept=".xlsx, .xls">
+            <button id="upload-btn" class="btn">Subir y Actualizar Catálogo</button>
+        </div>
+        
         <div class="table-container">
+            <h2>Lista de Precios Actual</h2>
+            <p>Esta es la lista que están viendo los clientes en este momento.</p>
             <table id="price-table">
-                <thead>
-                    <tr>
-                        <th>Código</th>
-                        <th>Descripción</th>
-                        <th>Precio</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
+                <thead><tr><th>Código</th><th>Descripción</th><th>Precio</th></tr></thead>
+                <tbody>
+                    <tr><td colspan="3">Cargando productos...</td></tr>
+                </tbody>
             </table>
         </div>
     </main>
 
     <footer>
         <div class="container">
-            <p>&copy; 2026 POLCARFER SRL - Todos los derechos reservados.</p>
+            <p>&copy; 2026 POLCARFER SRL - Panel de Socios</p>
         </div>
     </footer>
 
+    <!-- ¡MUY IMPORTANTE! NO necesitamos productos.js aquí -->
     <script src="JS/script.js"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-/* --- IMPORTACIÓN DE FUENTES PROFESIONALES (NUEVO) --- */
+/* --- IMPORTACIÓN DE FUENTES PROFESIONALES --- */
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Roboto:wght@400;500&display=swap');
 
 /* --- ESTILOS GLOBALES Y PALETA DE COLORES --- */
@@ -9,14 +9,14 @@
     --color-amarillo-secundario: #FFD54F;
     --color-texto-principal: #E0E0E0;
     --color-texto-secundario: #BDBDBD;
-    --color-borde: #333; /* Un poco más suave */
+    --color-borde: #333;
     --sombra-suave: 0 4px 15px rgba(0, 0, 0, 0.2);
     --sombra-fuerte: 0 8px 25px rgba(0, 0, 0, 0.3);
 }
 
 body {
     margin: 0;
-    font-family: 'Roboto', sans-serif; /* Nueva fuente para el cuerpo */
+    font-family: 'Roboto', sans-serif;
     background-color: var(--color-negro-fondo);
     color: var(--color-texto-principal);
     line-height: 1.6;
@@ -29,8 +29,8 @@ body {
 }
 
 h1, h2, h3, .logo {
-    font-family: 'Montserrat', sans-serif; /* Nueva fuente para títulos */
-    letter-spacing: -1px; /* Detalle profesional */
+    font-family: 'Montserrat', sans-serif;
+    letter-spacing: -1px;
 }
 
 h1, h2 {
@@ -40,13 +40,13 @@ h1, h2 {
 a {
     color: var(--color-amarillo-secundario);
     text-decoration: none;
-    transition: color 0.3s ease; /* Transición suave para todos los links */
+    transition: color 0.3s ease;
 }
 a:hover {
     color: white;
 }
 
-/* --- HEADER Y NAVEGACIÓN (CON SOMBRA) --- */
+/* --- HEADER Y NAVEGACIÓN --- */
 header {
     background-color: var(--color-negro-caja);
     padding: 1rem 0;
@@ -54,7 +54,7 @@ header {
     position: sticky;
     top: 0;
     z-index: 1000;
-    box-shadow: var(--sombra-fuerte); /* Sombra para dar profundidad */
+    box-shadow: var(--sombra-fuerte);
 }
 
 header .container {
@@ -63,8 +63,16 @@ header .container {
     align-items: center;
 }
 
+.desktop-nav ul {
+    list-style: none; /* Quita los puntitos */
+    margin: 0;
+    padding: 0;
+    display: flex; /* Pone los elementos en línea */
+    gap: 20px;
+}
+
 .desktop-nav a {
-    position: relative; /* Base para el subrayado animado */
+    position: relative;
     color: var(--color-texto-principal);
     font-weight: 500;
     padding: 8px 12px;
@@ -74,7 +82,7 @@ header .container {
 .desktop-nav a.active {
     color: var(--color-amarillo-principal);
 }
-.desktop-nav a::after { /* Subrayado animado (NUEVO) */
+.desktop-nav a::after {
     content: '';
     position: absolute;
     width: 100%;
@@ -91,7 +99,7 @@ header .container {
     transform-origin: bottom left;
 }
 
-/* --- BOTONES CON EFECTO "LEVANTAR" (MEJORADO) --- */
+/* --- BOTONES --- */
 .btn {
     display: inline-block;
     padding: 12px 24px;
@@ -105,104 +113,165 @@ header .container {
     transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
 }
 .btn:hover {
-    transform: translateY(-3px); /* Efecto de levantar */
+    transform: translateY(-3px);
     box-shadow: var(--sombra-fuerte);
     text-decoration: none;
     background-color: var(--color-amarillo-secundario);
 }
-.btn.btn-primary {
-    padding: 15px 30px;
-    font-size: 1.1rem;
+.btn.btn-primary { padding: 15px 30px; font-size: 1.1rem; }
+
+/* --- SOLAPA "PEDIDOS": ESTILOS DE TARJETA MODERNOS --- */
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 30px;
+    margin-top: 30px;
 }
 
-/* --- TARJETAS DE PRODUCTO PROFESIONALES (MEJORADO) --- */
 .product-card {
     background-color: var(--color-negro-caja);
-    border: 1px solid var(--color-borde);
-    border-radius: 12px; /* Bordes más redondeados */
-    padding: 20px;
+    border: 1px solid transparent;
+    border-radius: 8px;
     text-align: center;
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* Para que nada se salga */
-    box-shadow: var(--sombra-suave);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 .product-card:hover {
-    transform: scale(1.03); /* Se agranda al pasar el mouse */
-    box-shadow: var(--sombra-fuerte);
+    transform: translateY(-5px);
     border-color: var(--color-amarillo-principal);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.4);
 }
 .product-card img {
-    max-width: 100%;
-    height: 160px; /* Un poco más de espacio */
+    width: 100%;
+    height: 200px;
     object-fit: contain;
-    margin-bottom: 20px;
-    transition: transform 0.3s ease;
+    background-color: white;
 }
-.product-card:hover img {
-    transform: scale(1.05); /* Zoom sutil a la imagen también */
+.product-card-content {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
 }
 .product-card h3 {
-    margin: 10px 0;
+    margin: 0 0 10px 0;
     color: var(--color-texto-principal);
     flex-grow: 1;
     font-size: 1.1rem;
+    min-height: 44px;
 }
 .product-card .price {
     color: var(--color-amarillo-principal);
-    font-size: 1.3rem;
+    font-size: 1.4rem;
     font-weight: bold;
-    margin: 10px 0 20px 0;
+    margin: 15px 0;
 }
 
-/* --- MODAL CON ANIMACIÓN DE ENTRADA (NUEVO) --- */
-@keyframes fadeIn {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
+/* --- SOLAPA "LISTA DE PRECIOS": DISEÑO MÁS ANCHO Y LIMPIO --- */
+#page-lista-precios .page-content {
+    max-width: 90%;
+    margin: 0 auto;
+    padding-top: 40px;
+    padding-bottom: 40px;
 }
-.modal.active .modal-content { /* Solo se anima al estar activo */
-    animation: fadeIn 0.3s ease-out;
+.admin-section {
+    background-color: var(--color-negro-caja);
+    border: 1px solid var(--color-borde);
+    padding: 25px;
+    margin-bottom: 40px;
+    border-radius: 8px;
 }
-.modal-content {
-    border-radius: 12px; /* Bordes redondeados */
-    border-top: 4px solid var(--color-amarillo-principal); /* Acento de marca */
+#price-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 1rem;
 }
-.btn-secondary {
-    border-radius: 50px; /* Botón píldora, muy moderno */
+#price-table th, #price-table td {
+    border: 1px solid var(--color-borde);
+    padding: 15px;
+    text-align: left;
+}
+#price-table thead {
+    background-color: #2a2a2a;
+}
+#price-table th {
+    color: var(--color-amarillo-principal);
+    font-weight: bold;
+}
+#price-table tr:nth-child(even) {
+    background-color: var(--color-negro-caja);
 }
 
-/* --- SLIDER DE INICIO (SIN CAMBIOS, YA ERA PROFESIONAL) --- */
+/* --- SOLAPA "CONTACTO": ESTILO RESTAURADO Y MEJORADO --- */
+.contact-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+    margin-top: 40px;
+}
+.contact-item {
+    background-color: var(--color-negro-caja);
+    padding: 30px;
+    border-radius: 8px;
+    border: 1px solid var(--color-borde);
+    transition: transform 0.3s ease, border-color 0.3s ease;
+}
+.contact-item:hover {
+    transform: translateY(-5px);
+    border-color: var(--color-amarillo-principal);
+}
+.contact-item h3 {
+    margin-top: 0;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--color-amarillo-principal);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+}
+.contact-item h3::before {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    margin-right: 15px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    filter: invert(79%) sepia(80%) saturate(1069%) hue-rotate(357deg) brightness(102%) contrast(105%);
+}
+.contact-item:nth-child(1) h3::before { background-image: url('https://img.icons8.com/ios-glyphs/30/phone--v1.png'); }
+.contact-item:nth-child(2) h3::before { background-image: url('https://img.icons8.com/ios-glyphs/30/new-post.png'); }
+.contact-item:nth-child(3) h3::before { background-image: url('https://img.icons8.com/ios-glyphs/30/marker--v1.png'); }
+.contact-item:nth-child(4) h3::before { background-image: url('https://img.icons8.com/ios-glyphs/30/instagram-new.png'); }
+
+/* --- ESTILOS DE CARRITO Y SLIDER --- */
+.cart-icon-container { position: relative; cursor: pointer; }
+#cart-count { position: absolute; top: -10px; right: -10px; background-color: red; color: white; border-radius: 50%; padding: 2px 6px; font-size: 12px; font-weight: bold; }
+.modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.8); }
+.modal.active .modal-content { animation: fadeIn 0.3s ease-out; }
+.modal-content { background-color: var(--color-negro-caja); margin: 10% auto; padding: 20px; border-radius: 12px; border-top: 4px solid var(--color-amarillo-principal); width: 80%; max-width: 600px; position: relative; }
+.close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
+.close-button:hover, .close-button:focus { color: white; text-decoration: none; cursor: pointer; }
+#cart-summary { text-align: right; margin-top: 20px; }
+#cart-summary small { display: block; margin-top: 10px; color: var(--color-texto-secundario); }
 .hero-slider { position: relative; height: 70vh; width: 100%; overflow: hidden; display: flex; justify-content: center; align-items: center; }
 .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0; transition: opacity 1.5s ease-in-out; z-index: 1; }
 .slide.active { opacity: 1; }
 .hero-content { position: relative; z-index: 2; text-align: center; color: white; background-color: rgba(0, 0, 0, 0.6); padding: 40px 60px; border-radius: 8px; }
 .hero-content h1 { font-size: 3.5rem; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.7); }
-
-/* --- OTROS ESTILOS (YA ESTABAN BIEN, PEQUEÑOS AJUSTES) --- */
-.cart-icon-container, #price-table, .contact-info { /* Reutilizamos la sombra */
-    box-shadow: var(--sombra-suave);
-}
-#price-table, .contact-item {
-    border-radius: 8px;
-    border: 1px solid var(--color-borde);
-}
-.admin-section {
-    border-radius: 8px;
-}
-.contact-item h3 {
-    padding-bottom: 10px;
-    margin-bottom: 15px; /* Más espacio */
-}
-
-/* --- MENÚ MÓVIL Y RESPONSIVE (SIN CAMBIOS DE LÓGICA, PEQUEÑO AJUSTE) --- */
-.hamburger-menu, .mobile-nav { display: none; }
-.desktop-nav ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 20px; }
+.btn-secondary { background-color: transparent; color: var(--color-texto-secundario); border: 1px solid var(--color-texto-secundario); padding: 8px 15px; margin-top: 10px; font-size: 0.9rem; border-radius: 50px; }
+.btn-secondary:hover { background-color: var(--color-borde); color: var(--color-texto-principal); text-decoration: none; }
 .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--color-borde); }
 .cart-item-info { flex-grow: 1; }
 .quantity-controls { display: flex; align-items: center; gap: 10px; margin: 0 20px; }
 .quantity-btn { background-color: var(--color-amarillo-principal); color: var(--color-negro-fondo); border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 18px; font-weight: bold; cursor: pointer; line-height: 28px; transition: transform 0.2s; }
 .quantity-btn:hover { transform: scale(1.1); }
+
+/* --- MENÚ MÓVIL Y RESPONSIVE --- */
+.hamburger-menu, .mobile-nav { display: none; }
 @media (max-width: 768px) {
     .desktop-nav { display: none; }
     .hamburger-menu { display: flex; flex-direction: column; justify-content: space-around; width: 30px; height: 25px; background: transparent; border: none; cursor: pointer; padding: 0; z-index: 2001; }

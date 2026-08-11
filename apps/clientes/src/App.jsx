@@ -18,6 +18,7 @@ const OrdersView = React.lazy(() => import('./components/OrdersView.jsx'));
 const ContactView = React.lazy(() => import('./components/ContactView.jsx'));
 const NewsView = React.lazy(() => import('./components/NewsView.jsx'));
 const PartnerAccessView = React.lazy(() => import('./components/PartnerAccessView.jsx'));
+const WelcomeNewsCarousel = React.lazy(() => import('./components/WelcomeNewsCarousel.jsx'));
 
 const VALID_VIEWS = new Set([
   'home',
@@ -113,7 +114,12 @@ export default function App() {
   );
 
   return (
-    <AppShell view={view} onViewChange={go} cartCount={cartCount}>
+    <>
+      <React.Suspense fallback={null}>
+        <WelcomeNewsCarousel onViewAll={() => go('news')} />
+      </React.Suspense>
+
+      <AppShell view={view} onViewChange={go} cartCount={cartCount}>
       {error && view !== 'home' && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           {error}
@@ -123,6 +129,7 @@ export default function App() {
       <React.Suspense fallback={<ViewLoading />}>
         {body}
       </React.Suspense>
-    </AppShell>
+      </AppShell>
+    </>
   );
 }

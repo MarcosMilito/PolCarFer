@@ -1,4 +1,13 @@
-import * as XLSX from 'xlsx';
+let xlsxModulePromise;
+
+async function loadXlsx() {
+  if (!xlsxModulePromise) {
+    xlsxModulePromise = import('xlsx').then((module) =>
+      module.default?.utils ? module.default : module
+    );
+  }
+  return xlsxModulePromise;
+}
 
 export const IVA = 0.21;
 export const CONTACT = {
@@ -188,6 +197,7 @@ function firstUnused(list=[],usedIds){
 }
 
 export async function parseExcel(file,currentProducts=[]){
+ const XLSX=await loadXlsx();
  const buffer=await file.arrayBuffer();
  const wb=XLSX.read(buffer,{type:'array'});
  const sheetName=wb.SheetNames.find(n=>normalizeText(n)==='lista de precios')||wb.SheetNames[0];
@@ -275,7 +285,8 @@ export async function parseExcel(file,currentProducts=[]){
  }).filter(Boolean);
 }
 
-export function exportExcel(products, filename = 'POLCARFER - Lista de Precios.xlsx') {
+export async function exportExcel(products, filename = 'POLCARFER - Lista de Precios.xlsx') {
+  const XLSX = await loadXlsx();
   const rows = products.map((p) => ({
     'Código': p.codigo,
     'Producto': p.nombre,
@@ -317,7 +328,8 @@ export function exportExcel(products, filename = 'POLCARFER - Lista de Precios.x
   XLSX.writeFile(wb, filename);
 }
 
-export function exportAdminExcel(products, filename = 'POLCARFER - Catalogo Editable.xlsx') {
+export async function exportAdminExcel(products, filename = 'POLCARFER - Catalogo Editable.xlsx') {
+  const XLSX = await loadXlsx();
   /*
    * El ID interno se exporta en la primera columna, pero queda OCULTO.
    * El socio no tiene que verlo, completarlo ni modificarlo.

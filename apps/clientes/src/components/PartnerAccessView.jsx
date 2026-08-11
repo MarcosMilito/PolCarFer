@@ -520,7 +520,7 @@ function ImportView({ products, refresh }) {
               {[
                 'Actualizar los productos que ya existen.',
                 'Crear automáticamente los productos nuevos.',
-                'Admitir códigos comerciales repetidos usando el ID interno.',
+                'Identificar automáticamente cada producto, incluso cuando se repite el código.',
                 'Normalizar presentaciones simples como “12” → “12 unidades”.',
                 'Dejar fuera de la lista pública los productos que ya no aparecen.'
               ].map((text) => (
@@ -551,9 +551,14 @@ function ImportView({ products, refresh }) {
         </Grid>
       </Grid>
 
-      <Button variant="outlined" startIcon={<DownloadRoundedIcon />} sx={{ alignSelf: 'flex-start' }} onClick={() => exportAdminExcel(products)}>
-        Exportar catálogo actual
-      </Button>
+      <Stack spacing={0.7} alignItems="flex-start">
+        <Button variant="outlined" startIcon={<DownloadRoundedIcon />} onClick={() => exportAdminExcel(products)}>
+          Descargar catálogo editable
+        </Button>
+        <Typography variant="caption" color="text.secondary">
+          Podés agregar filas nuevas normalmente. El sistema genera sus identificadores internos al importar.
+        </Typography>
+      </Stack>
     </Stack>
   );
 }

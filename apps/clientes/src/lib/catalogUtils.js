@@ -317,7 +317,16 @@ export function exportExcel(products, filename = 'POLCARFER - Lista de Precios.x
   XLSX.writeFile(wb, filename);
 }
 
-export function exportAdminExcel(products, filename = 'POLCARFER - Catalogo Interno.xlsx') {
+export function exportAdminExcel(products, filename = 'POLCARFER - Catalogo Editable.xlsx') {
+  /*
+   * El ID interno se exporta en la primera columna, pero queda OCULTO.
+   * El socio no tiene que verlo, completarlo ni modificarlo.
+   *
+   * - Producto existente: conserva su UUID oculto y se actualiza exactamente.
+   * - Fila nueva: ID vacío -> Supabase genera el UUID automáticamente al importar.
+   * - Excel externo sin ID: parseExcel usa Código + Producto + Presentación
+   *   y solo cae al código cuando no existe ambigüedad.
+   */
   const rows = products.map((p) => ({
     'ID Sistema': p.id || '',
     'Código': p.codigo,
@@ -326,18 +335,46 @@ export function exportAdminExcel(products, filename = 'POLCARFER - Catalogo Inte
     'Rubro': p.rubro,
     'Sección': p.seccion,
     'Stock': p.stock ?? '',
-    'Precio de lista': p.precioLista,
-    'Descuento': p.descuento,
-    'Precio S/IVA': finalSinIva(p),
-    'Precio C/IVA': finalConIva(p)
+    'Precio de lista': Number(p.precioLista || 0),
+    'Descuento': Number(p.descuento || 0),
+    'Precio S/IVA': Number(finalSinIva(p) || 0),
+    'Precio C/IVA': Number(finalConIva(p) || 0)
   }));
 
   const ws = XLSX.utils.json_to_sheet(rows);
+
+  // La columna A contiene el ID técnico y se oculta para el usuario.
   ws['!cols'] = [
-    { wch: 38 }, { wch: 16 }, { wch: 55 }, { wch: 24 }, { wch: 25 },
-    { wch: 35 }, { wch: 12 }, { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 18 }
+    { wch: 38, hidden: true },
+    { wch: 16 },
+    { wch: 55 },
+    { wch: 24 },
+    { wch: 25 },
+    { wch: 35 },
+    { wch: 12 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 18 },
+    { wch: 18 }
   ];
-  if (ws['!ref']) ws['!autofilter'] = { ref: ws['!ref'] };
+
+  if (ws['!ref']) {
+    ws['!autofilter'] = { ref: ws['!ref'] };
+
+    // Formato numérico. A está oculta, por lo que las columnas visibles empiezan en B.
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let row = 1; row <= range.e.r; row++) {
+      const precioLista = ws[XLSX.utils.encode_cell({ r: row, c: 7 })];
+      const descuento = ws[XLSX.utils.encode_cell({ r: row, c: 8 })];
+      const sinIva = ws[XLSX.utils.encode_cell({ r: row, c: 9 })];
+      const conIva = ws[XLSX.utils.encode_cell({ r: row, c: 10 })];
+
+      if (precioLista) precioLista.z = '$ #,##0.00';
+      if (descuento) descuento.z = '0%';
+      if (sinIva) sinIva.z = '$ #,##0.00';
+      if (conIva) conIva.z = '$ #,##0.00';
+    }
+  }
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Lista de Precios');

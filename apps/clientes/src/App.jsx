@@ -16,6 +16,7 @@ import {
 const PriceListView = React.lazy(() => import('./components/PriceListView.jsx'));
 const OrdersView = React.lazy(() => import('./components/OrdersView.jsx'));
 const ContactView = React.lazy(() => import('./components/ContactView.jsx'));
+const NewsView = React.lazy(() => import('./components/NewsView.jsx'));
 const PartnerAccessView = React.lazy(() => import('./components/PartnerAccessView.jsx'));
 
 const VALID_VIEWS = new Set([
@@ -23,6 +24,7 @@ const VALID_VIEWS = new Set([
   'prices',
   'orders',
   'contact',
+  'news',
   'partner'
 ]);
 
@@ -90,6 +92,8 @@ export default function App() {
     body = <OrdersView products={products} cart={cart} setCart={setCart} />;
   } else if (view === 'contact') {
     body = <ContactView />;
+  } else if (view === 'news') {
+    body = <NewsView />;
   } else if (view === 'partner') {
     body = <PartnerAccessView products={products} onCatalogChanged={refresh} />;
   } else {

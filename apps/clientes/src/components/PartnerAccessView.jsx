@@ -44,6 +44,7 @@ import CloudDoneOutlinedIcon from '@mui/icons-material/CloudDoneOutlined';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded';
 import { supabase, isSupabaseConfigured } from '../lib/supabase.js';
 import {
   exportAdminExcel,
@@ -57,6 +58,13 @@ import {
   parseNumber,
   IVA
 } from '../lib/catalogUtils.js';
+import {
+  createNews,
+  deleteNews,
+  loadAdminNews,
+  setNewsActive,
+  subscribeNews
+} from '../lib/newsService.js';
 
 function toDatabase(product) {
   const p = normalizeProduct(product);
@@ -563,6 +571,296 @@ function ImportView({ products, refresh }) {
   );
 }
 
+
+function NewsAdminView() {
+  const [items, setItems] = React.useState([]);
+  const [titulo, setTitulo] = React.useState('');
+  const [descripcion, setDescripcion] = React.useState('');
+  const [file, setFile] = React.useState(null);
+  const [preview, setPreview] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [loadingList, setLoadingList] = React.useState(true);
+  const [message, setMessage] = React.useState(null);
+
+  const refresh = React.useCallback(async () => {
+    try {
+      const data = await loadAdminNews();
+      setItems(data);
+    } catch (err) {
+      console.error(err);
+      setMessage({
+        type: 'error',
+        text: err?.message || 'No se pudieron cargar las novedades.'
+      });
+    } finally {
+      setLoadingList(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    refresh();
+    const stop = subscribeNews(refresh);
+    return () => stop?.();
+  }, [refresh]);
+
+  React.useEffect(() => {
+    if (!file) {
+      setPreview('');
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const publicar = async () => {
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      await createNews({
+        titulo,
+        descripcion,
+        file
+      });
+
+      setTitulo('');
+      setDescripcion('');
+      setFile(null);
+      await refresh();
+
+      setMessage({
+        type: 'success',
+        text: 'Novedad publicada. Los clientes ya pueden verla.'
+      });
+    } catch (err) {
+      console.error(err);
+      setMessage({
+        type: 'error',
+        text: err?.message || 'No se pudo publicar la novedad.'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Stack spacing={2.5}>
+      <Box>
+        <Typography variant="overline" color="primary.main">COMUNICACIÓN</Typography>
+        <Typography variant="h4" sx={{ mt: .3 }}>Novedades</Typography>
+        <Typography color="text.secondary" sx={{ mt: .6, maxWidth: 760 }}>
+          Publicá imágenes para que aparezcan directamente en la pestaña Novedades del portal de clientes.
+        </Typography>
+      </Box>
+
+      {message && <Alert severity={message.type}>{message.text}</Alert>}
+
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, lg: 5 }}>
+          <Paper variant="outlined" sx={{ p: { xs: 2.2, md: 3 } }}>
+            <Stack spacing={2.2}>
+              <Box>
+                <Typography variant="h6">Nueva publicación</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: .5 }}>
+                  JPG, PNG o WEBP. Máximo 5 MB.
+                </Typography>
+              </Box>
+
+              <TextField
+                label="Título"
+                value={titulo}
+                onChange={(event) => setTitulo(event.target.value)}
+                inputProps={{ maxLength: 140 }}
+                fullWidth
+              />
+
+              <TextField
+                label="Descripción"
+                value={descripcion}
+                onChange={(event) => setDescripcion(event.target.value)}
+                inputProps={{ maxLength: 1000 }}
+                multiline
+                minRows={3}
+                fullWidth
+              />
+
+              <Button
+                component="label"
+                variant="outlined"
+                startIcon={<UploadFileRoundedIcon />}
+                sx={{ alignSelf: 'flex-start' }}
+              >
+                {file ? file.name : 'Seleccionar imagen'}
+                <input
+                  hidden
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(event) => setFile(event.target.files?.[0] || null)}
+                />
+              </Button>
+
+              {preview && (
+                <Box
+                  component="img"
+                  src={preview}
+                  alt="Vista previa"
+                  sx={{
+                    width: '100%',
+                    maxHeight: 330,
+                    objectFit: 'cover',
+                    borderRadius: 2.5,
+                    border: '1px solid rgba(255,255,255,.08)'
+                  }}
+                />
+              )}
+
+              <Button
+                size="large"
+                variant="contained"
+                startIcon={<CampaignRoundedIcon />}
+                disabled={loading || !titulo.trim() || !file}
+                onClick={publicar}
+              >
+                {loading ? 'Publicando…' : 'Publicar novedad'}
+              </Button>
+            </Stack>
+          </Paper>
+        </Grid>
+
+        <Grid size={{ xs: 12, lg: 7 }}>
+          <Stack spacing={1.5}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="h6">Publicaciones</Typography>
+              <Chip
+                size="small"
+                label={`${items.length} ${items.length === 1 ? 'novedad' : 'novedades'}`}
+                variant="outlined"
+              />
+            </Stack>
+
+            {loadingList ? (
+              <Stack alignItems="center" sx={{ py: 7 }}>
+                <CircularProgress size={30} />
+              </Stack>
+            ) : items.length === 0 ? (
+              <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
+                <CampaignRoundedIcon sx={{ color: 'primary.main', fontSize: 38, mb: 1 }} />
+                <Typography fontWeight={800}>Todavía no publicaste novedades</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: .5 }}>
+                  La primera publicación va a aparecer acá y en el portal de clientes.
+                </Typography>
+              </Paper>
+            ) : (
+              items.map((item) => (
+                <Paper
+                  key={item.id}
+                  variant="outlined"
+                  sx={{
+                    p: 1.5,
+                    opacity: item.activo ? 1 : .62
+                  }}
+                >
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={1.5}
+                    alignItems={{ sm: 'center' }}
+                  >
+                    <Box
+                      component="img"
+                      src={item.imagenUrl}
+                      alt={item.titulo}
+                      sx={{
+                        width: { xs: '100%', sm: 150 },
+                        height: { xs: 190, sm: 100 },
+                        objectFit: 'cover',
+                        borderRadius: 2,
+                        flexShrink: 0
+                      }}
+                    />
+
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                        <Typography fontWeight={850}>{item.titulo}</Typography>
+                        <Chip
+                          size="small"
+                          color={item.activo ? 'success' : 'default'}
+                          label={item.activo ? 'Publicada' : 'Oculta'}
+                        />
+                      </Stack>
+                      {item.descripcion && (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            mt: .6,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {item.descripcion}
+                        </Typography>
+                      )}
+                    </Box>
+
+                    <Stack
+                      direction={{ xs: 'row', sm: 'column' }}
+                      spacing={.7}
+                      sx={{ flexShrink: 0 }}
+                    >
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={async () => {
+                          try {
+                            await setNewsActive(item.id, !item.activo);
+                            await refresh();
+                          } catch (err) {
+                            setMessage({
+                              type: 'error',
+                              text: err?.message || 'No se pudo cambiar la visibilidad.'
+                            });
+                          }
+                        }}
+                      >
+                        {item.activo ? 'Ocultar' : 'Publicar'}
+                      </Button>
+
+                      <Button
+                        size="small"
+                        color="error"
+                        startIcon={<DeleteOutlineRoundedIcon />}
+                        onClick={async () => {
+                          if (!confirm(`¿Eliminar la novedad "${item.titulo}"?`)) return;
+                          try {
+                            await deleteNews(item);
+                            await refresh();
+                          } catch (err) {
+                            setMessage({
+                              type: 'error',
+                              text: err?.message || 'No se pudo eliminar la novedad.'
+                            });
+                          }
+                        }}
+                      >
+                        Eliminar
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </Paper>
+              ))
+            )}
+          </Stack>
+        </Grid>
+      </Grid>
+    </Stack>
+  );
+}
+
 function StatCard({ icon: Icon, label, value, helper }) {
   return (
     <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
@@ -631,7 +929,8 @@ function Dashboard({ products, onNavigate }) {
 const NAV_ITEMS = [
   ['dashboard', 'Resumen', DashboardRoundedIcon],
   ['products', 'Productos', Inventory2OutlinedIcon],
-  ['import', 'Actualizar lista', UploadFileRoundedIcon]
+  ['import', 'Actualizar lista', UploadFileRoundedIcon],
+  ['news', 'Novedades', CampaignRoundedIcon]
 ];
 
 export default function PartnerAccessView({ products, onCatalogChanged }) {
@@ -729,6 +1028,8 @@ export default function PartnerAccessView({ products, onCatalogChanged }) {
           <ProductsView products={products} refresh={onCatalogChanged} />
         ) : section === 'import' ? (
           <ImportView products={products} refresh={onCatalogChanged} />
+        ) : section === 'news' ? (
+          <NewsAdminView />
         ) : (
           <Dashboard products={products} onNavigate={setSection} />
         )}

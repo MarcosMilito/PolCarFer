@@ -167,122 +167,618 @@ export function toDb(p,{includeId=true}={}){
 
 export function fromDb(row){return normalizeProduct(row);}
 
-function findHeader(raw,names){
- const h=(raw[0]||[]).map(normalizeText);
- return h.findIndex(cell=>names.some(n=>cell===normalizeText(n)));
+
+function findHeaderInRow(row, names) {
+  const normalized = (row || []).map(normalizeText);
+  return normalized.findIndex((cell) =>
+    names.some((name) => cell === normalizeText(name))
+  );
 }
 
-function buildCandidateMaps(products){
- const byId=new Map();
- const byExact=new Map();
- const byCodePresentation=new Map();
- const byCodeName=new Map();
- const byCode=new Map();
- const add=(map,key,p)=>{
-  if(!map.has(key)) map.set(key,[]);
-  map.get(key).push(p);
- };
- for(const p of products){
-  if(p.id) byId.set(String(p.id),p);
-  add(byExact,productIdentityKey(p),p);
-  add(byCodePresentation,[p.codigo,normalizePresentation(p.presentacion)].map(normalizeText).join('|'),p);
-  add(byCodeName,[p.codigo,p.nombre].map(normalizeText).join('|'),p);
-  add(byCode,normalizeText(p.codigo),p);
- }
- return {byId,byExact,byCodePresentation,byCodeName,byCode};
+function findHeaderLayout(raw) {
+  const maxRows = Math.min(raw.length, 80);
+
+  for (let headerRow = 0; headerRow < maxRows; headerRow++) {
+    const row = raw[headerRow] || [];
+
+    const systemId = findHeaderInRow(row, ['ID Sistema', 'ID interno', 'System ID']);
+    const code = findHeaderInRow(row, ['Código', 'Codigo', 'CODIGO']);
+    const name = findHeaderInRow(row, [
+      'Producto',
+      'Nombre',
+      'Descripción',
+      'Descripcion',
+      'Detalle',
+      'DETALLE'
+    ]);
+    const pres = findHeaderInRow(row, ['Presentación', 'Presentacion', 'PRESENTACION']);
+    const rubro = findHeaderInRow(row, ['Rubro', 'Categoría', 'Categoria']);
+    const section = findHeaderInRow(row, ['Sección', 'Seccion']);
+    const stock = findHeaderInRow(row, ['Stock', 'Existencia', 'Existencias']);
+    const list = findHeaderInRow(row, [
+      'Precio de lista',
+      'Precio lista',
+      'Lista',
+      'LISTA'
+    ]);
+    const disc = findHeaderInRow(row, ['Descuento', 'DESCUENTO']);
+    const sin = findHeaderInRow(row, [
+      'Precio S/IVA',
+      'Precio S IVA',
+      'Precio sin IVA',
+      'S/IVA'
+    ]);
+    const con = findHeaderInRow(row, [
+      'Precio C/IVA',
+      'Precio C IVA',
+      'Precio con IVA',
+      'C/IVA'
+    ]);
+    const bulk = findHeaderInRow(row, [
+      'Cantidad por bulto',
+      'CANTIDAD POR BULTO'
+    ]);
+    const sizeUnits = findHeaderInRow(row, [
+      'Tamaño/Unidades',
+      'Tamano/Unidades',
+      'TAMAÑO/UNIDADES',
+      'TAMANO/UNIDADES'
+    ]);
+
+    if (code >= 0 && name >= 0 && (list >= 0 || sin >= 0)) {
+      return {
+        headerRow,
+        systemId,
+        code,
+        name,
+        pres,
+        rubro,
+        section,
+        stock,
+        list,
+        disc,
+        sin,
+        con,
+        bulk,
+        sizeUnits
+      };
+    }
+  }
+
+  return null;
 }
 
-function firstUnused(list=[],usedIds){
- return list.find(p=>p.id&&!usedIds.has(String(p.id)))||null;
+function numericCell(value) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  const text = String(value ?? '').trim();
+  if (!text || text.startsWith('=')) return 0;
+  return parseNumber(text);
 }
 
-export async function parseExcel(file,currentProducts=[]){
- const XLSX=await loadXlsx();
- const buffer=await file.arrayBuffer();
- const wb=XLSX.read(buffer,{type:'array'});
- const sheetName=wb.SheetNames.find(n=>normalizeText(n)==='lista de precios')||wb.SheetNames[0];
- if(!sheetName) throw new Error('El archivo no contiene hojas.');
- const raw=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:''});
- if(!raw.length) throw new Error('La hoja está vacía.');
+function combinePresentation(first, second) {
+  const a = String(first ?? '').trim().replace(/\s+/g, ' ');
+  const b = String(second ?? '').trim().replace(/\s+/g, ' ');
 
- const systemId=findHeader(raw,['ID Sistema','ID interno','System ID']);
- const code=findHeader(raw,['Código','Codigo']);
- const name=findHeader(raw,['Producto','Nombre','Descripción','Descripcion']);
- const pres=findHeader(raw,['Presentación','Presentacion']);
- const rubro=findHeader(raw,['Rubro','Categoría','Categoria']);
- const section=findHeader(raw,['Sección','Seccion']);
- const stock=findHeader(raw,['Stock','Existencia','Existencias']);
- const list=findHeader(raw,['Precio de lista','Precio lista']);
- const disc=findHeader(raw,['Descuento']);
- const sin=findHeader(raw,['Precio S/IVA','Precio S IVA','Precio sin IVA']);
- const con=findHeader(raw,['Precio C/IVA','Precio C IVA','Precio con IVA']);
+  if (!a) return normalizePresentation(b);
+  if (!b) return normalizePresentation(a);
+  if (normalizeText(a) === normalizeText(b)) return normalizePresentation(a);
 
- if(code<0||name<0||(list<0&&sin<0)){
-  throw new Error('El Excel debe tener Código, Producto y Precio de lista o Precio S/IVA.');
- }
+  return normalizePresentation(`${a} ${b}`);
+}
 
- const maps=buildCandidateMaps(currentProducts);
- const usedIds=new Set();
+function isLikelySectionLabel(name, presentation = '') {
+  const text = String(name ?? '').trim().replace(/\s+/g, ' ');
+  if (!text) return false;
 
- return raw.slice(1).map(row=>{
-  const c=String(row[code]||'').trim();
-  const n=String(row[name]||'').trim();
-  if(!c||!n) return null;
-
-  const presentation=normalizePresentation(pres>=0?row[pres]:'');
-  const explicitId=systemId>=0?String(row[systemId]||'').trim():'';
-  let old=explicitId&&maps.byId.get(explicitId)&&!usedIds.has(explicitId)?maps.byId.get(explicitId):null;
-
-  if(!old) old=firstUnused(maps.byExact.get(productIdentityKey({codigo:c,nombre:n,presentacion:presentation})),usedIds);
-
-  if(!old){
-   const key=[c,presentation].map(normalizeText).join('|');
-   const candidates=(maps.byCodePresentation.get(key)||[]).filter(p=>p.id&&!usedIds.has(String(p.id)));
-   if(candidates.length===1) old=candidates[0];
+  const normalized = normalizeText(text);
+  if (
+    normalized.includes('fecha:') ||
+    normalized === 'polcarfersrl' ||
+    normalized.includes('15-5821') ||
+    normalized.includes('15-2370')
+  ) {
+    return false;
   }
 
-  if(!old){
-   const key=[c,n].map(normalizeText).join('|');
-   const candidates=(maps.byCodeName.get(key)||[]).filter(p=>p.id&&!usedIds.has(String(p.id)));
-   if(candidates.length===1) old=candidates[0];
+  const words = text.split(/\s+/).filter(Boolean);
+  const hasDigits = /\d/.test(text);
+  const hasPresentation = Boolean(String(presentation ?? '').trim());
+
+  if (!hasPresentation) return words.length <= 12;
+  return !hasDigits && words.length <= 9;
+}
+
+function buildCandidateMaps(products) {
+  const byId = new Map();
+  const byExact = new Map();
+  const byCodePresentation = new Map();
+  const byCodeName = new Map();
+  const byCode = new Map();
+
+  const add = (map, key, product) => {
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(product);
+  };
+
+  for (const product of products) {
+    if (product.id) byId.set(String(product.id), product);
+    add(byExact, productIdentityKey(product), product);
+    add(
+      byCodePresentation,
+      [product.codigo, normalizePresentation(product.presentacion)]
+        .map(normalizeText)
+        .join('|'),
+      product
+    );
+    add(
+      byCodeName,
+      [product.codigo, product.nombre].map(normalizeText).join('|'),
+      product
+    );
+    add(byCode, normalizeText(product.codigo), product);
   }
 
-  // Solo cae al código si ese código identifica un único producto pendiente.
-  // Así los códigos repetidos nunca se pisan entre sí.
-  if(!old){
-   const candidates=(maps.byCode.get(normalizeText(c))||[]).filter(p=>p.id&&!usedIds.has(String(p.id)));
-   if(candidates.length===1) old=candidates[0];
+  return { byId, byExact, byCodePresentation, byCodeName, byCode };
+}
+
+function firstUnused(list = [], usedIds) {
+  return list.find(
+    (product) => product.id && !usedIds.has(String(product.id))
+  ) || null;
+}
+
+function findExistingProduct(product, maps, usedIds) {
+  const explicitId = product.id ? String(product.id) : '';
+
+  if (explicitId) {
+    const direct = maps.byId.get(explicitId);
+    if (direct && !usedIds.has(explicitId)) return direct;
   }
 
-  if(old?.id) usedIds.add(String(old.id));
-  old=old||{};
+  let old = firstUnused(
+    maps.byExact.get(productIdentityKey(product)),
+    usedIds
+  );
+  if (old) return old;
 
-  const finalPresentation=pres>=0?presentation:normalizePresentation(old.presentacion);
-  const d=disc>=0?normalizeDiscount(row[disc]):normalizeDiscount(old.descuento||0);
-  const listPrice=list>=0?parseNumber(row[list]):parseNumber(row[sin]);
-  const sinCell=sin>=0?parseNumber(row[sin]):listPrice;
-  const sinBase=d>0&&sinCell>0&&sinCell<listPrice?sinCell/(1-d):sinCell;
-  const conCell=con>=0?parseNumber(row[con]):sinBase*(1+IVA);
-  const conBase=d>0&&conCell>0&&conCell<sinBase*(1+IVA)?conCell/(1-d):conCell;
+  const codePresentationKey = [
+    product.codigo,
+    normalizePresentation(product.presentacion)
+  ]
+    .map(normalizeText)
+    .join('|');
+
+  const byPresentation = (
+    maps.byCodePresentation.get(codePresentationKey) || []
+  ).filter(
+    (candidate) =>
+      candidate.id && !usedIds.has(String(candidate.id))
+  );
+
+  if (byPresentation.length === 1) return byPresentation[0];
+
+  const codeNameKey = [product.codigo, product.nombre]
+    .map(normalizeText)
+    .join('|');
+
+  const byName = (maps.byCodeName.get(codeNameKey) || []).filter(
+    (candidate) =>
+      candidate.id && !usedIds.has(String(candidate.id))
+  );
+
+  if (byName.length === 1) return byName[0];
+
+  const byCode = (
+    maps.byCode.get(normalizeText(product.codigo)) || []
+  ).filter(
+    (candidate) =>
+      candidate.id && !usedIds.has(String(candidate.id))
+  );
+
+  if (byCode.length === 1) return byCode[0];
+
+  return null;
+}
+
+function attachExistingIds(rows, currentProducts = []) {
+  const maps = buildCandidateMaps(currentProducts);
+  const usedIds = new Set();
+
+  return rows.map((row) => {
+    const old = findExistingProduct(row, maps, usedIds);
+
+    if (old?.id) usedIds.add(String(old.id));
+
+    return normalizeProduct({
+      ...row,
+      id: old?.id || row.id || null,
+      rubro: old?.rubro || row.rubro || detectRubro(
+        row.nombre,
+        row.presentacion,
+        row.seccion || old?.seccion || ''
+      ),
+      seccion: old?.seccion || row.seccion || '',
+      stock:
+        row.stock !== null && row.stock !== undefined
+          ? row.stock
+          : old?.stock ?? null
+    });
+  });
+}
+
+function normalizedSheetMap(workbook) {
+  const map = new Map();
+  for (const name of workbook.SheetNames || []) {
+    map.set(normalizeText(name), name);
+  }
+  return map;
+}
+
+function parseLegacyBaseSheet(XLSX, workbook, sheetName, config = {}) {
+  const raw = XLSX.utils.sheet_to_json(
+    workbook.Sheets[sheetName],
+    { header: 1, defval: '' }
+  );
+
+  const layout = findHeaderLayout(raw);
+  if (!layout) return [];
+
+  let currentSection = '';
+  const rows = [];
+
+  for (let index = layout.headerRow + 1; index < raw.length; index++) {
+    const row = raw[index] || [];
+    const code = String(row[layout.code] ?? '').trim();
+    const name = String(row[layout.name] ?? '').trim();
+    const sinIva = layout.sin >= 0 ? numericCell(row[layout.sin]) : 0;
+
+    const sectionPresentation =
+      layout.pres >= 0
+        ? row[layout.pres]
+        : layout.bulk >= 0
+          ? row[layout.bulk]
+          : '';
+
+    if (!code && name && !sinIva) {
+      if (isLikelySectionLabel(name, sectionPresentation)) {
+        currentSection = name.trim();
+      }
+      continue;
+    }
+
+    if (!code || !name || sinIva <= 0) continue;
+
+    let presentation = '';
+
+    if (config.combineBulkAndSize) {
+      presentation = combinePresentation(
+        layout.bulk >= 0 ? row[layout.bulk] : '',
+        layout.sizeUnits >= 0 ? row[layout.sizeUnits] : ''
+      );
+    } else {
+      presentation = normalizePresentation(
+        layout.pres >= 0 ? row[layout.pres] : ''
+      );
+    }
+
+    const conIvaCell =
+      layout.con >= 0 ? numericCell(row[layout.con]) : 0;
+    const conIva = conIvaCell || sinIva * (1 + IVA);
+
+    rows.push(
+      normalizeProduct({
+        codigo: code,
+        nombre: name,
+        presentacion: presentation,
+        rubro: detectRubro(name, presentation, currentSection),
+        seccion: currentSection,
+        precioLista: sinIva,
+        precioSinIva: sinIva,
+        precioConIva: conIva,
+        descuento: 0,
+        precioSinIvaDescuento: 0,
+        precioConIvaDescuento: 0,
+        stock: null,
+        activo: true,
+        origen: sheetName
+      })
+    );
+  }
+
+  return rows;
+}
+
+function parseLegacyDiscounts(XLSX, workbook, sheetName) {
+  if (!sheetName) return { byExact: new Map(), byCode: new Map() };
+
+  const raw = XLSX.utils.sheet_to_json(
+    workbook.Sheets[sheetName],
+    { header: 1, defval: '' }
+  );
+  const layout = findHeaderLayout(raw);
+
+  if (!layout || layout.disc < 0 || layout.list < 0) {
+    return { byExact: new Map(), byCode: new Map() };
+  }
+
+  const byExact = new Map();
+  const byCode = new Map();
+
+  for (let index = layout.headerRow + 1; index < raw.length; index++) {
+    const row = raw[index] || [];
+    const code = String(row[layout.code] ?? '').trim();
+    const name = String(row[layout.name] ?? '').trim();
+    const listPrice = numericCell(row[layout.list]);
+
+    if (!code || !name || listPrice <= 0) continue;
+
+    const discount = normalizeDiscount(row[layout.disc]);
+    const discountedSin =
+      layout.sin >= 0 ? numericCell(row[layout.sin]) : 0;
+    const discountedCon =
+      layout.con >= 0 ? numericCell(row[layout.con]) : 0;
+
+    const info = {
+      listPrice,
+      discount,
+      discountedSin:
+        discountedSin ||
+        (discount > 0 ? listPrice * (1 - discount) : 0),
+      discountedCon:
+        discountedCon ||
+        (discount > 0
+          ? listPrice * (1 - discount) * (1 + IVA)
+          : 0)
+    };
+
+    const exactKey = [code, name].map(normalizeText).join('|');
+    byExact.set(exactKey, info);
+
+    const codeKey = normalizeText(code);
+    if (!byCode.has(codeKey)) byCode.set(codeKey, []);
+    byCode.get(codeKey).push({ name, info });
+  }
+
+  return { byExact, byCode };
+}
+
+function applyLegacyDiscount(product, discountMaps) {
+  const exactKey = [product.codigo, product.nombre]
+    .map(normalizeText)
+    .join('|');
+
+  let discountInfo = discountMaps.byExact.get(exactKey);
+
+  if (!discountInfo) {
+    const candidates = discountMaps.byCode.get(
+      normalizeText(product.codigo)
+    ) || [];
+
+    if (candidates.length === 1) {
+      discountInfo = candidates[0].info;
+    }
+  }
+
+  if (!discountInfo) return product;
+
+  const listPrice = discountInfo.listPrice || product.precioSinIva;
+  const discount = discountInfo.discount;
 
   return normalizeProduct({
-   id:old.id||null,
-   codigo:c,
-   nombre:n,
-   presentacion:finalPresentation,
-   rubro:rubro>=0?row[rubro]:old.rubro,
-   seccion:section>=0?row[section]:old.seccion,
-   precioLista:listPrice||sinBase,
-   precioSinIva:sinBase,
-   precioConIva:conBase,
-   descuento:d,
-   precioSinIvaDescuento:d>0?sinBase*(1-d):0,
-   precioConIvaDescuento:d>0?conBase*(1-d):0,
-   stock:stock>=0&&row[stock]!==''?parseNumber(row[stock]):old.stock,
-   activo:true,
-   origen:'IMPORTADO EXCEL'
+    ...product,
+    precioLista: listPrice,
+    precioSinIva: listPrice,
+    precioConIva: listPrice * (1 + IVA),
+    descuento: discount,
+    precioSinIvaDescuento:
+      discount > 0 ? discountInfo.discountedSin : 0,
+    precioConIvaDescuento:
+      discount > 0 ? discountInfo.discountedCon : 0
   });
- }).filter(Boolean);
+}
+
+function parseLegacyPolcarferWorkbook(XLSX, workbook, currentProducts) {
+  const sheets = normalizedSheetMap(workbook);
+  const listSheet = sheets.get('lista de precios');
+  const suprabondSheet = sheets.get('suprabond-bulit-somerset');
+
+  if (!listSheet || !suprabondSheet) return null;
+
+  const discountSheet = sheets.get('lista con descuentos');
+
+  const baseRows = [
+    ...parseLegacyBaseSheet(XLSX, workbook, listSheet),
+    ...parseLegacyBaseSheet(
+      XLSX,
+      workbook,
+      suprabondSheet,
+      { combineBulkAndSize: true }
+    )
+  ];
+
+  if (!baseRows.length) return null;
+
+  const discounts = parseLegacyDiscounts(
+    XLSX,
+    workbook,
+    discountSheet
+  );
+
+  const merged = baseRows.map((product) =>
+    applyLegacyDiscount(product, discounts)
+  );
+
+  return attachExistingIds(merged, currentProducts);
+}
+
+function findBestGenericSheet(XLSX, workbook) {
+  let best = null;
+
+  for (const sheetName of workbook.SheetNames || []) {
+    const raw = XLSX.utils.sheet_to_json(
+      workbook.Sheets[sheetName],
+      { header: 1, defval: '' }
+    );
+
+    const layout = findHeaderLayout(raw);
+    if (!layout) continue;
+
+    let score = 0;
+    if (normalizeText(sheetName) === 'lista de precios') score += 10;
+    if (layout.systemId >= 0) score += 6;
+    if (layout.pres >= 0) score += 3;
+    if (layout.list >= 0) score += 3;
+    if (layout.disc >= 0) score += 2;
+    if (layout.stock >= 0) score += 1;
+
+    if (!best || score > best.score) {
+      best = { sheetName, raw, layout, score };
+    }
+  }
+
+  return best;
+}
+
+function parseGenericRows(raw, layout, currentProducts) {
+  const rows = [];
+
+  for (let index = layout.headerRow + 1; index < raw.length; index++) {
+    const row = raw[index] || [];
+    const code = String(row[layout.code] ?? '').trim();
+    const name = String(row[layout.name] ?? '').trim();
+
+    if (!code || !name) continue;
+
+    const presentation = normalizePresentation(
+      layout.pres >= 0 ? row[layout.pres] : ''
+    );
+
+    const explicitId =
+      layout.systemId >= 0
+        ? String(row[layout.systemId] ?? '').trim()
+        : '';
+
+    const discount =
+      layout.disc >= 0
+        ? normalizeDiscount(row[layout.disc])
+        : 0;
+
+    const listPrice =
+      layout.list >= 0
+        ? numericCell(row[layout.list])
+        : numericCell(row[layout.sin]);
+
+    const sinCell =
+      layout.sin >= 0
+        ? numericCell(row[layout.sin])
+        : listPrice;
+
+    if (listPrice <= 0 && sinCell <= 0) continue;
+
+    const baseSin =
+      discount > 0 &&
+      listPrice > 0 &&
+      sinCell > 0 &&
+      sinCell < listPrice
+        ? sinCell / (1 - discount)
+        : sinCell || listPrice;
+
+    const conCell =
+      layout.con >= 0
+        ? numericCell(row[layout.con])
+        : 0;
+
+    const baseCon =
+      discount > 0 &&
+      conCell > 0 &&
+      conCell < baseSin * (1 + IVA)
+        ? conCell / (1 - discount)
+        : conCell || baseSin * (1 + IVA);
+
+    rows.push(
+      normalizeProduct({
+        id: explicitId || null,
+        codigo: code,
+        nombre: name,
+        presentacion: presentation,
+        rubro: layout.rubro >= 0 ? row[layout.rubro] : '',
+        seccion: layout.section >= 0 ? row[layout.section] : '',
+        precioLista: listPrice || baseSin,
+        precioSinIva: baseSin,
+        precioConIva: baseCon,
+        descuento: discount,
+        precioSinIvaDescuento:
+          discount > 0 ? baseSin * (1 - discount) : 0,
+        precioConIvaDescuento:
+          discount > 0 ? baseCon * (1 - discount) : 0,
+        stock:
+          layout.stock >= 0 && row[layout.stock] !== ''
+            ? numericCell(row[layout.stock])
+            : null,
+        activo: true,
+        origen: 'IMPORTADO EXCEL'
+      })
+    );
+  }
+
+  return attachExistingIds(rows, currentProducts);
+}
+
+export async function parseExcel(file, currentProducts = []) {
+  const XLSX = await loadXlsx();
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+
+  if (!workbook.SheetNames?.length) {
+    throw new Error('El archivo no contiene hojas.');
+  }
+
+  /*
+   * Formato histórico real de POLCARFER:
+   * - LISTA DE PRECIOS
+   * - SUPRABOND-BULIT-SOMERSET
+   * - LISTA CON DESCUENTOS
+   *
+   * Se unen automáticamente las 2 hojas de productos y se
+   * superponen los descuentos de la tercera.
+   */
+  const legacy = parseLegacyPolcarferWorkbook(
+    XLSX,
+    workbook,
+    currentProducts
+  );
+
+  if (legacy?.length) return legacy;
+
+  /*
+   * Formato editable exportado por el sistema o planillas
+   * similares. El encabezado puede estar dentro de las
+   * primeras 80 filas y acepta DETALLE, LISTA, S/IVA, C/IVA.
+   */
+  const generic = findBestGenericSheet(XLSX, workbook);
+
+  if (!generic) {
+    throw new Error(
+      'No pude encontrar una tabla de productos. Necesito columnas equivalentes a Código, Producto/Detalle y Precio de lista o S/IVA.'
+    );
+  }
+
+  const rows = parseGenericRows(
+    generic.raw,
+    generic.layout,
+    currentProducts
+  );
+
+  if (!rows.length) {
+    throw new Error(
+      'Encontré los encabezados, pero no detecté productos con código, descripción y precio.'
+    );
+  }
+
+  return rows;
 }
 
 export async function exportExcel(products, filename = 'POLCARFER - Lista de Precios.xlsx') {

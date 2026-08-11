@@ -24,6 +24,7 @@ import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import ListAltRoundedIcon from '@mui/icons-material/ListAltRounded';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
 import SupportAgentRoundedIcon from '@mui/icons-material/SupportAgentRounded';
+import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 
@@ -31,6 +32,7 @@ const NAV = [
   ['home', 'Inicio', HomeRoundedIcon],
   ['prices', 'Lista de precios', ListAltRoundedIcon],
   ['orders', 'Pedido', ShoppingBagOutlinedIcon],
+  ['news', 'Novedades', CampaignRoundedIcon],
   ['contact', 'Contacto', SupportAgentRoundedIcon]
 ];
 

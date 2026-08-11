@@ -1291,87 +1291,210 @@ export async function parseExcel(
 
 export function exportExcel(
   products,
-  filename =
-    'PolCarFer - Lista de Precios.xlsx'
+  filename = 'POLCARFER - Lista de Precios.xlsx'
 ) {
-  const rows =
-    products.map(
-      (product) => ({
-        'ID Sistema':
-          product.id || '',
+  const rows = products.map((p) => ({
+    'Código': p.codigo,
+    'Producto': p.nombre,
+    'Presentación': normalizePresentation(
+      p.presentacion
+    ),
+    'Precio de lista': Number(
+      p.precioLista || 0
+    ),
+    'Descuento': Number(
+      p.descuento || 0
+    ),
+    'Precio S/IVA': Number(
+      finalSinIva(p) || 0
+    ),
+    'Precio C/IVA': Number(
+      finalConIva(p) || 0
+    )
+  }));
 
-        Código:
-          product.codigo,
+  const ws =
+    XLSX.utils.json_to_sheet(rows);
 
-        Producto:
-          product.nombre,
-
-        Presentación:
-          normalizePresentation(
-            product.presentacion
-          ),
-
-        Rubro:
-          product.rubro,
-
-        Sección:
-          product.seccion,
-
-        Stock:
-          product.stock ??
-          '',
-
-        'Precio de lista':
-          product.precioLista,
-
-        'Descuento %':
-          Math.round(
-            product.descuento *
-              10000
-          ) / 100,
-
-        'Precio S/IVA':
-          finalSinIva(
-            product
-          ),
-
-        'Precio C/IVA':
-          finalConIva(
-            product
-          )
-      })
-    );
-
-  const worksheet =
-    XLSX.utils.json_to_sheet(
-      rows
-    );
-
-  worksheet['!cols'] = [
-    { wch: 38 },
-    { wch: 16 },
-    { wch: 58 },
-    { wch: 22 },
-    { wch: 26 },
-    { wch: 34 },
-    { wch: 12 },
-    { wch: 16 },
-    { wch: 14 },
-    { wch: 16 },
-    { wch: 16 }
+  /*
+   * Ancho de columnas
+   */
+  ws['!cols'] = [
+    { wch: 16 }, // Código
+    { wch: 55 }, // Producto
+    { wch: 24 }, // Presentación
+    { wch: 18 }, // Precio lista
+    { wch: 14 }, // Descuento
+    { wch: 18 }, // S/IVA
+    { wch: 18 }  // C/IVA
   ];
 
-  const workbook =
+  /*
+   * Filtro en encabezados
+   */
+  if (ws['!ref']) {
+    ws['!autofilter'] = {
+      ref: ws['!ref']
+    };
+  }
+
+  /*
+   * Formato de precios y descuento
+   */
+  const range =
+    XLSX.utils.decode_range(
+      ws['!ref']
+    );
+
+  for (
+    let row = 1;
+    row <= range.e.r;
+    row++
+  ) {
+    /*
+     * D = Precio de lista
+     * E = Descuento
+     * F = Precio S/IVA
+     * G = Precio C/IVA
+     */
+
+    const precioLista =
+      ws[
+        XLSX.utils.encode_cell({
+          r: row,
+          c: 3
+        })
+      ];
+
+    const descuento =
+      ws[
+        XLSX.utils.encode_cell({
+          r: row,
+          c: 4
+        })
+      ];
+
+    const sinIva =
+      ws[
+        XLSX.utils.encode_cell({
+          r: row,
+          c: 5
+        })
+      ];
+
+    const conIva =
+      ws[
+        XLSX.utils.encode_cell({
+          r: row,
+          c: 6
+        })
+      ];
+
+    if (precioLista) {
+      precioLista.z =
+        '$ #,##0.00';
+    }
+
+    if (descuento) {
+      descuento.z =
+        '0%';
+    }
+
+    if (sinIva) {
+      sinIva.z =
+        '$ #,##0.00';
+    }
+
+    if (conIva) {
+      conIva.z =
+        '$ #,##0.00';
+    }
+  }
+
+  const wb =
     XLSX.utils.book_new();
 
   XLSX.utils.book_append_sheet(
-    workbook,
-    worksheet,
+    wb,
+    ws,
     'Lista de Precios'
   );
 
   XLSX.writeFile(
-    workbook,
+    wb,
+    filename
+  );
+}
+
+
+/*
+ * EXPORTACIÓN INTERNA PARA SOCIOS
+ *
+ * Esta sí conserva ID Sistema,
+ * rubro, sección y stock para
+ * poder volver a importar el archivo.
+ */
+export function exportAdminExcel(
+  products,
+  filename = 'POLCARFER - Catalogo Interno.xlsx'
+) {
+  const rows = products.map((p) => ({
+    'ID Sistema': p.id || '',
+    'Código': p.codigo,
+    'Producto': p.nombre,
+    'Presentación':
+      normalizePresentation(
+        p.presentacion
+      ),
+    'Rubro': p.rubro,
+    'Sección': p.seccion,
+    'Stock': p.stock ?? '',
+    'Precio de lista':
+      p.precioLista,
+    'Descuento':
+      p.descuento,
+    'Precio S/IVA':
+      finalSinIva(p),
+    'Precio C/IVA':
+      finalConIva(p)
+  }));
+
+  const ws =
+    XLSX.utils.json_to_sheet(
+      rows
+    );
+
+  ws['!cols'] = [
+    { wch: 38 },
+    { wch: 16 },
+    { wch: 55 },
+    { wch: 24 },
+    { wch: 25 },
+    { wch: 35 },
+    { wch: 12 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 18 },
+    { wch: 18 }
+  ];
+
+  if (ws['!ref']) {
+    ws['!autofilter'] = {
+      ref: ws['!ref']
+    };
+  }
+
+  const wb =
+    XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(
+    wb,
+    ws,
+    'Lista de Precios'
+  );
+
+  XLSX.writeFile(
+    wb,
     filename
   );
 }

@@ -1,7 +1,7 @@
 import React from 'react';
-
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Chip,
@@ -11,10 +11,11 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  Grid,
+  IconButton,
   InputAdornment,
   Paper,
   Stack,
-  Tab,
   Table,
   TableBody,
   TableCell,
@@ -22,26 +23,30 @@ import {
   TableHead,
   TablePagination,
   TableRow,
-  Tabs,
   TextField,
-  Typography
+  Tooltip,
+  Typography,
+  useMediaQuery
 } from '@mui/material';
-
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
-import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
-
+import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
+import SellOutlinedIcon from '@mui/icons-material/SellOutlined';
+import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
+import CloudDoneOutlinedIcon from '@mui/icons-material/CloudDoneOutlined';
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import { supabase, isSupabaseConfigured } from '../lib/supabase.js';
 import {
-  supabase,
-  isSupabaseConfigured
-} from '../lib/supabase.js';
-
-import {
-  exportExcel,
+  exportAdminExcel,
   finalSinIva,
   formatPrice,
   normalizeDiscount,
@@ -53,202 +58,70 @@ import {
   IVA
 } from '../lib/catalogUtils.js';
 
-
-/* =========================================================
-   UTILIDADES
-========================================================= */
-
 function toDatabase(product) {
   const p = normalizeProduct(product);
-
   return {
     codigo: p.codigo,
     nombre: p.nombre,
-
-    presentacion:
-      normalizePresentation(
-        p.presentacion
-      ),
-
-    rubro:
-      p.rubro || 'General',
-
-    seccion:
-      p.seccion || '',
-
-    precio_lista:
-      Number(
-        p.precioLista || 0
-      ),
-
-    precio_sin_iva:
-      Number(
-        p.precioSinIva || 0
-      ),
-
-    precio_con_iva:
-      Number(
-        p.precioConIva || 0
-      ),
-
-    descuento:
-      Number(
-        p.descuento || 0
-      ),
-
-    precio_sin_iva_descuento:
-      Number(
-        p.precioSinIvaDescuento || 0
-      ),
-
-    precio_con_iva_descuento:
-      Number(
-        p.precioConIvaDescuento || 0
-      ),
-
-    stock:
-      p.stock === '' ||
-      p.stock === undefined
-        ? null
-        : p.stock,
-
+    presentacion: normalizePresentation(p.presentacion),
+    rubro: p.rubro || 'General',
+    seccion: p.seccion || '',
+    precio_lista: Number(p.precioLista || 0),
+    precio_sin_iva: Number(p.precioSinIva || 0),
+    precio_con_iva: Number(p.precioConIva || 0),
+    descuento: Number(p.descuento || 0),
+    precio_sin_iva_descuento: Number(p.precioSinIvaDescuento || 0),
+    precio_con_iva_descuento: Number(p.precioConIvaDescuento || 0),
+    stock: p.stock === '' || p.stock === undefined ? null : p.stock,
     activo: true,
-
-    origen:
-      p.origen ||
-      'SISTEMA SOCIOS',
-
-    updated_at:
-      new Date().toISOString()
+    origen: p.origen || 'SISTEMA SOCIOS',
+    updated_at: new Date().toISOString()
   };
 }
 
-
 async function comprobarSocio() {
-  const {
-    data,
-    error
-  } = await supabase.rpc(
-    'is_socio'
-  );
-
+  const { data, error } = await supabase.rpc('is_socio');
   if (error) {
-    console.error(
-      'Error comprobando socio:',
-      error
-    );
-
+    console.error('Error comprobando socio:', error);
     return false;
   }
-
   return data === true;
 }
 
+function LoginSocio({ onSuccess }) {
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
 
-/* =========================================================
-   LOGIN
-========================================================= */
-
-function LoginSocio({
-  onSuccess
-}) {
-  const [email, setEmail] =
-    React.useState('');
-
-  const [
-    password,
-    setPassword
-  ] = React.useState('');
-
-  const [loading, setLoading] =
-    React.useState(false);
-
-  const [error, setError] =
-    React.useState('');
-
-  const ingresar = async (
-    event
-  ) => {
+  const ingresar = async (event) => {
     event.preventDefault();
-
     setError('');
-
-    if (
-      !email.trim() ||
-      !password
-    ) {
-      setError(
-        'Ingresá el email y la contraseña.'
-      );
-
+    if (!email.trim() || !password) {
+      setError('Ingresá el email y la contraseña.');
       return;
     }
-
     setLoading(true);
-
     try {
-      const {
-        data,
-        error:
-          loginError
-      } =
-        await supabase.auth
-          .signInWithPassword({
-            email:
-              email
-                .trim()
-                .toLowerCase(),
+      const { data, error: loginError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password
+      });
+      if (loginError) throw loginError;
+      if (!data.session) throw new Error('No se pudo iniciar la sesión.');
 
-            password
-          });
-
-      if (loginError) {
-        throw loginError;
-      }
-
-      if (!data.session) {
-        throw new Error(
-          'No se pudo iniciar la sesión.'
-        );
-      }
-
-      const autorizado =
-        await comprobarSocio();
-
+      const autorizado = await comprobarSocio();
       if (!autorizado) {
         await supabase.auth.signOut();
-
-        throw new Error(
-          'El usuario existe, pero no tiene permisos de socio.'
-        );
+        throw new Error('El usuario existe, pero no tiene permisos de socio.');
       }
-
-      onSuccess(
-        data.session
-      );
+      onSuccess(data.session);
     } catch (err) {
-      console.error(err);
-
-      const mensaje =
-        String(
-          err?.message || ''
-        );
-
-      if (
-        mensaje
-          .toLowerCase()
-          .includes(
-            'invalid login credentials'
-          )
-      ) {
-        setError(
-          'El email o la contraseña son incorrectos.'
-        );
+      const mensaje = String(err?.message || '');
+      if (mensaje.toLowerCase().includes('invalid login credentials')) {
+        setError('El email o la contraseña son incorrectos.');
       } else {
-        setError(
-          mensaje ||
-            'No se pudo ingresar.'
-        );
+        setError(mensaje || 'No se pudo ingresar.');
       }
     } finally {
       setLoading(false);
@@ -256,769 +129,240 @@ function LoginSocio({
   };
 
   return (
-    <Box
-      sx={{
-        maxWidth: 480,
-        mx: 'auto',
-        py: {
-          xs: 2,
-          md: 6
-        }
-      }}
-    >
-      <Paper
-        variant="outlined"
-        sx={{
-          p: {
-            xs: 3,
-            md: 4
-          }
-        }}
-      >
-        <Stack spacing={2.5}>
-
-          <Box
-            sx={{
-              width: 52,
-              height: 52,
-              borderRadius: 2.5,
-              display: 'grid',
-              placeItems: 'center',
-              bgcolor:
-                'rgba(255,138,61,.12)'
-            }}
-          >
-            <LockOutlinedIcon
-              color="primary"
-            />
-          </Box>
-
-          <Box>
-            <Typography
-              variant="h4"
-              fontWeight={900}
-            >
-              Acceso de socios
-            </Typography>
-
-            <Typography
-              color="text.secondary"
-              sx={{ mt: 1 }}
-            >
-              Ingresá con las
-              credenciales de
-              POLCARFER.
-            </Typography>
-          </Box>
-
-          {!isSupabaseConfigured && (
-            <Alert severity="error">
-              La conexión con
-              Supabase todavía no
-              está configurada.
-            </Alert>
-          )}
-
-          {error && (
-            <Alert severity="error">
-              {error}
-            </Alert>
-          )}
-
-          <Box
-            component="form"
-            onSubmit={ingresar}
-          >
-            <Stack spacing={2}>
-
-              <TextField
-                fullWidth
-                label="Email"
-                type="email"
-                value={email}
-                onChange={(
-                  event
-                ) =>
-                  setEmail(
-                    event.target.value
-                  )
-                }
-              />
-
-              <TextField
-                fullWidth
-                label="Contraseña"
-                type="password"
-                value={password}
-                onChange={(
-                  event
-                ) =>
-                  setPassword(
-                    event.target.value
-                  )
-                }
-              />
-
-              <Button
-                type="submit"
-                variant="contained"
-                size="large"
-                disabled={
-                  loading ||
-                  !isSupabaseConfigured
-                }
-              >
-                {loading
-                  ? 'Ingresando...'
-                  : 'Ingresar'}
-              </Button>
-
+    <Grid container spacing={2.5} alignItems="stretch" sx={{ maxWidth: 1100, mx: 'auto', py: { xs: 1, md: 4 } }}>
+      <Grid size={{ xs: 12, md: 6.2 }}>
+        <Paper
+          variant="outlined"
+          sx={{
+            p: { xs: 3, md: 4.5 },
+            height: '100%',
+            minHeight: { md: 500 },
+            display: 'flex',
+            alignItems: 'flex-end',
+            background:
+              'radial-gradient(circle at 70% 20%, rgba(255,138,61,.22), transparent 27%), linear-gradient(145deg, #101c28, #09121b)'
+          }}
+        >
+          <Stack spacing={3}>
+            <Avatar sx={{ width: 56, height: 56, bgcolor: 'primary.main', color: 'primary.contrastText', fontWeight: 950 }}>PF</Avatar>
+            <Box>
+              <Typography variant="overline" color="primary.main">ÁREA PRIVADA</Typography>
+              <Typography variant="h3" sx={{ mt: .5, fontSize: { xs: '2rem', md: '3rem' } }}>
+                Gestión simple del catálogo.
+              </Typography>
+              <Typography color="text.secondary" sx={{ mt: 1.5, maxWidth: 560, lineHeight: 1.7 }}>
+                Actualizá precios, modificá productos o importá una nueva lista. Los cambios se reflejan en el catálogo de clientes.
+              </Typography>
+            </Box>
+            <Stack spacing={1.3}>
+              {['Una sola base de productos', 'Edición manual e importación Excel', 'Cambios publicados para clientes'].map((text) => (
+                <Stack key={text} direction="row" spacing={1.2} alignItems="center">
+                  <CheckCircleRoundedIcon color="success" fontSize="small" />
+                  <Typography variant="body2">{text}</Typography>
+                </Stack>
+              ))}
             </Stack>
-          </Box>
+          </Stack>
+        </Paper>
+      </Grid>
 
-        </Stack>
-      </Paper>
-    </Box>
+      <Grid size={{ xs: 12, md: 5.8 }}>
+        <Paper variant="outlined" sx={{ p: { xs: 3, md: 4.5 }, height: '100%', display: 'flex', alignItems: 'center' }}>
+          <Stack spacing={2.6} sx={{ width: '100%' }}>
+            <Box sx={{ width: 52, height: 52, borderRadius: 2.5, bgcolor: 'rgba(255,138,61,.10)', color: 'primary.main', display: 'grid', placeItems: 'center' }}>
+              <LockOutlinedIcon />
+            </Box>
+            <Box>
+              <Typography variant="h4">Ingresar al sistema</Typography>
+              <Typography color="text.secondary" sx={{ mt: .8 }}>Acceso exclusivo para socios autorizados.</Typography>
+            </Box>
+
+            {!isSupabaseConfigured && <Alert severity="error">La conexión con Supabase todavía no está configurada.</Alert>}
+            {error && <Alert severity="error">{error}</Alert>}
+
+            <Box component="form" onSubmit={ingresar}>
+              <Stack spacing={2}>
+                <TextField fullWidth label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
+                <TextField fullWidth label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+                <Button type="submit" size="large" variant="contained" disabled={loading || !isSupabaseConfigured} endIcon={<ArrowForwardRoundedIcon />}>
+                  {loading ? 'Ingresando…' : 'Ingresar'}
+                </Button>
+              </Stack>
+            </Box>
+            <Typography variant="caption" color="text.secondary">
+              Las credenciales se validan de forma segura mediante Supabase Auth.
+            </Typography>
+          </Stack>
+        </Paper>
+      </Grid>
+    </Grid>
   );
 }
 
-
-/* =========================================================
-   EDICIÓN DE PRODUCTO
-========================================================= */
-
-function ProductDialog({
-  open,
-  product,
-  onClose,
-  onSaved
-}) {
-  const [form, setForm] =
-    React.useState({});
-
-  const [saving, setSaving] =
-    React.useState(false);
-
-  const [error, setError] =
-    React.useState('');
+function ProductDialog({ open, product, onClose, onSaved }) {
+  const [form, setForm] = React.useState({});
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState('');
 
   React.useEffect(() => {
-    if (product) {
-      setForm(product);
-    } else {
-      setForm({
-        codigo: '',
-        nombre: '',
-        presentacion: '',
-        rubro: '',
-        seccion: '',
-        precioLista: '',
-        precioSinIva: '',
-        precioConIva: '',
-        descuento: 0,
-        stock: ''
-      });
-    }
-
+    setForm(product || {
+      codigo: '', nombre: '', presentacion: '', rubro: '', seccion: '',
+      precioLista: '', precioSinIva: '', precioConIva: '', descuento: 0, stock: ''
+    });
     setError('');
   }, [product, open]);
 
-  const change = (
-    field,
-    value
-  ) => {
-    setForm(
-      (previous) => ({
-        ...previous,
-        [field]: value
-      })
-    );
-  };
+  const change = (field, value) => setForm((previous) => ({ ...previous, [field]: value }));
 
   const guardar = async () => {
-    if (
-      !form.codigo?.trim() ||
-      !form.nombre?.trim()
-    ) {
-      setError(
-        'Código y producto son obligatorios.'
-      );
-
+    if (!form.codigo?.trim() || !form.nombre?.trim()) {
+      setError('Código y producto son obligatorios.');
       return;
     }
-
     setSaving(true);
     setError('');
-
     try {
-      const precioSinIva =
-        parseNumber(
-          form.precioSinIva
-        );
-
-      const precioConIva =
-        parseNumber(
-          form.precioConIva
-        ) ||
-        precioSinIva *
-          (1 + IVA);
-
-      const descuento =
-        normalizeDiscount(
-          form.descuento
-        );
-
-      const producto =
-        normalizeProduct({
-          ...form,
-
-          presentacion:
-            normalizePresentation(
-              form.presentacion
-            ),
-
-          precioLista:
-            parseNumber(
-              form.precioLista
-            ) ||
-            precioSinIva,
-
-          precioSinIva,
-
-          precioConIva,
-
-          descuento,
-
-          precioSinIvaDescuento:
-            descuento > 0
-              ? precioSinIva *
-                (1 -
-                  descuento)
-              : 0,
-
-          precioConIvaDescuento:
-            descuento > 0
-              ? precioConIva *
-                (1 -
-                  descuento)
-              : 0,
-
-          stock:
-            form.stock === ''
-              ? null
-              : parseNumber(
-                  form.stock
-                )
-        });
+      const precioSinIva = parseNumber(form.precioSinIva);
+      const precioConIva = parseNumber(form.precioConIva) || precioSinIva * (1 + IVA);
+      const descuento = normalizeDiscount(form.descuento);
+      const producto = normalizeProduct({
+        ...form,
+        presentacion: normalizePresentation(form.presentacion),
+        precioLista: parseNumber(form.precioLista) || precioSinIva,
+        precioSinIva,
+        precioConIva,
+        descuento,
+        precioSinIvaDescuento: descuento > 0 ? precioSinIva * (1 - descuento) : 0,
+        precioConIvaDescuento: descuento > 0 ? precioConIva * (1 - descuento) : 0,
+        stock: form.stock === '' ? null : parseNumber(form.stock)
+      });
 
       if (product?.id) {
-        const {
-          error:
-            updateError
-        } =
-          await supabase
-            .from(
-              'products'
-            )
-            .update(
-              toDatabase(
-                producto
-              )
-            )
-            .eq(
-              'id',
-              product.id
-            );
-
-        if (updateError) {
-          throw updateError;
-        }
+        const { error: updateError } = await supabase.from('products').update(toDatabase(producto)).eq('id', product.id);
+        if (updateError) throw updateError;
       } else {
-        const {
-          error:
-            insertError
-        } =
-          await supabase
-            .from(
-              'products'
-            )
-            .insert(
-              toDatabase(
-                producto
-              )
-            );
-
-        if (insertError) {
-          throw insertError;
-        }
+        const { error: insertError } = await supabase.from('products').insert(toDatabase(producto));
+        if (insertError) throw insertError;
       }
 
       await onSaved();
-
       onClose();
     } catch (err) {
-      console.error(err);
-
-      setError(
-        err?.message ||
-          'No se pudo guardar el producto.'
-      );
+      setError(err?.message || 'No se pudo guardar el producto.');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      fullWidth
-      maxWidth="md"
-    >
-      <DialogTitle>
-        {product
-          ? 'Editar producto'
-          : 'Nuevo producto'}
-      </DialogTitle>
-
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+      <DialogTitle>{product ? 'Editar producto' : 'Nuevo producto'}</DialogTitle>
       <DialogContent>
-        <Stack
-          spacing={2}
-          sx={{ pt: 1 }}
-        >
-
-          {error && (
-            <Alert severity="error">
-              {error}
-            </Alert>
-          )}
-
-          <Stack
-            direction={{
-              xs: 'column',
-              md: 'row'
-            }}
-            spacing={2}
-          >
-            <TextField
-              fullWidth
-              label="Código"
-              value={
-                form.codigo || ''
-              }
-              onChange={(
-                event
-              ) =>
-                change(
-                  'codigo',
-                  event.target.value
-                )
-              }
-            />
-
-            <TextField
-              fullWidth
-              label="Producto"
-              value={
-                form.nombre || ''
-              }
-              onChange={(
-                event
-              ) =>
-                change(
-                  'nombre',
-                  event.target.value
-                )
-              }
-            />
-          </Stack>
-
-          <TextField
-            fullWidth
-            label="Presentación"
-            value={
-              form.presentacion ||
-              ''
-            }
-            helperText="Ejemplo: 12 → 12 unidades · UNIDAD → 1 unidad"
-            onChange={(
-              event
-            ) =>
-              change(
-                'presentacion',
-                event.target.value
-              )
-            }
-          />
-
-          <Stack
-            direction={{
-              xs: 'column',
-              md: 'row'
-            }}
-            spacing={2}
-          >
-            <TextField
-              fullWidth
-              label="Rubro"
-              value={
-                form.rubro || ''
-              }
-              onChange={(
-                event
-              ) =>
-                change(
-                  'rubro',
-                  event.target.value
-                )
-              }
-            />
-
-            <TextField
-              fullWidth
-              label="Sección"
-              value={
-                form.seccion || ''
-              }
-              onChange={(
-                event
-              ) =>
-                change(
-                  'seccion',
-                  event.target.value
-                )
-              }
-            />
-          </Stack>
-
-          <Stack
-            direction={{
-              xs: 'column',
-              md: 'row'
-            }}
-            spacing={2}
-          >
-            <TextField
-              fullWidth
-              label="Precio S/IVA"
-              type="number"
-              value={
-                form.precioSinIva ??
-                ''
-              }
-              onChange={(
-                event
-              ) =>
-                change(
-                  'precioSinIva',
-                  event.target.value
-                )
-              }
-            />
-
-            <TextField
-              fullWidth
-              label="Precio C/IVA"
-              type="number"
-              value={
-                form.precioConIva ??
-                ''
-              }
-              onChange={(
-                event
-              ) =>
-                change(
-                  'precioConIva',
-                  event.target.value
-                )
-              }
-            />
-
-            <TextField
-              fullWidth
-              label="Stock"
-              type="number"
-              value={
-                form.stock ?? ''
-              }
-              onChange={(
-                event
-              ) =>
-                change(
-                  'stock',
-                  event.target.value
-                )
-              }
-            />
-          </Stack>
-
+        <Stack spacing={2.2} sx={{ pt: 1 }}>
+          {error && <Alert severity="error">{error}</Alert>}
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Código" value={form.codigo || ''} onChange={(e) => change('codigo', e.target.value)} /></Grid>
+            <Grid size={{ xs: 12, sm: 8 }}><TextField fullWidth label="Producto" value={form.nombre || ''} onChange={(e) => change('nombre', e.target.value)} /></Grid>
+            <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth label="Presentación" helperText="Ej.: 12 → 12 unidades" value={form.presentacion || ''} onChange={(e) => change('presentacion', e.target.value)} /></Grid>
+            <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth label="Rubro" value={form.rubro || ''} onChange={(e) => change('rubro', e.target.value)} /></Grid>
+            <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth label="Sección" value={form.seccion || ''} onChange={(e) => change('seccion', e.target.value)} /></Grid>
+            <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth label="Stock" type="number" value={form.stock ?? ''} onChange={(e) => change('stock', e.target.value)} /></Grid>
+            <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Precio de lista" type="number" value={form.precioLista ?? ''} onChange={(e) => change('precioLista', e.target.value)} /></Grid>
+            <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Precio S/IVA" type="number" value={form.precioSinIva ?? ''} onChange={(e) => change('precioSinIva', e.target.value)} /></Grid>
+            <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Precio C/IVA" type="number" value={form.precioConIva ?? ''} onChange={(e) => change('precioConIva', e.target.value)} /></Grid>
+            <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Descuento %" type="number" value={typeof form.descuento === 'number' ? Math.round(form.descuento * 100) : form.descuento || ''} onChange={(e) => change('descuento', e.target.value)} /></Grid>
+          </Grid>
         </Stack>
       </DialogContent>
-
       <DialogActions>
-        <Button onClick={onClose}>
-          Cancelar
-        </Button>
-
-        <Button
-          variant="contained"
-          disabled={saving}
-          onClick={guardar}
-        >
-          {saving
-            ? 'Guardando...'
-            : 'Guardar'}
-        </Button>
+        <Button onClick={onClose}>Cancelar</Button>
+        <Button variant="contained" disabled={saving} onClick={guardar}>{saving ? 'Guardando…' : 'Guardar cambios'}</Button>
       </DialogActions>
     </Dialog>
   );
 }
 
+function ProductsView({ products, refresh }) {
+  const [search, setSearch] = React.useState('');
+  const [page, setPage] = React.useState(0);
+  const [rows, setRows] = React.useState(25);
+  const [selected, setSelected] = React.useState(null);
+  const [dialogOpen, setDialogOpen] = React.useState(false);
 
-/* =========================================================
-   PRODUCTOS
-========================================================= */
+  const filtered = React.useMemo(() => {
+    const query = normalizeText(search);
+    if (!query) return products;
+    return products.filter((product) => normalizeText(`${product.codigo} ${product.nombre} ${product.presentacion} ${product.rubro} ${product.seccion}`).includes(query));
+  }, [products, search]);
 
-function ProductsView({
-  products,
-  refresh
-}) {
-  const [search, setSearch] =
-    React.useState('');
+  const visible = filtered.slice(page * rows, page * rows + rows);
 
-  const [page, setPage] =
-    React.useState(0);
-
-  const [rows, setRows] =
-    React.useState(25);
-
-  const [
-    selected,
-    setSelected
-  ] = React.useState(null);
-
-  const [
-    dialogOpen,
-    setDialogOpen
-  ] = React.useState(false);
-
-  const filtered =
-    React.useMemo(() => {
-      const query =
-        normalizeText(search);
-
-      if (!query) {
-        return products;
-      }
-
-      return products.filter(
-        (product) =>
-          normalizeText(
-            `${product.codigo} ${product.nombre} ${product.presentacion} ${product.rubro}`
-          ).includes(query)
-      );
-    }, [products, search]);
-
-  const visible =
-    filtered.slice(
-      page * rows,
-      page * rows + rows
-    );
+  const deactivate = async (product) => {
+    if (!confirm(`¿Desactivar ${product.codigo} - ${product.nombre}?`)) return;
+    const { error } = await supabase.from('products').update({ activo: false, updated_at: new Date().toISOString() }).eq('id', product.id);
+    if (error) throw error;
+    await refresh();
+  };
 
   return (
-    <Stack spacing={2.5}>
-
-      <Stack
-        direction={{
-          xs: 'column',
-          md: 'row'
-        }}
-        justifyContent="space-between"
-        gap={2}
-      >
+    <Stack spacing={2.3}>
+      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'center' }} gap={2}>
         <Box>
-          <Typography
-            variant="h5"
-            fontWeight={900}
-          >
-            Productos
-          </Typography>
-
-          <Typography
-            color="text.secondary"
-          >
-            Buscá y modificá
-            productos individualmente.
-          </Typography>
+          <Typography variant="h5">Gestión de productos</Typography>
+          <Typography color="text.secondary" sx={{ mt: .4 }}>{filtered.length.toLocaleString('es-AR')} productos disponibles.</Typography>
         </Box>
-
-        <Button
-          variant="contained"
-          startIcon={
-            <AddRoundedIcon />
-          }
-          onClick={() => {
-            setSelected(null);
-            setDialogOpen(true);
-          }}
-        >
+        <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => { setSelected(null); setDialogOpen(true); }}>
           Nuevo producto
         </Button>
       </Stack>
 
       <TextField
         fullWidth
-        placeholder="Buscar código, producto, presentación o rubro..."
+        placeholder="Buscar código, producto, presentación, rubro o sección…"
         value={search}
-        onChange={(event) => {
-          setSearch(
-            event.target.value
-          );
-
-          setPage(0);
-        }}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchRoundedIcon />
-            </InputAdornment>
-          )
-        }}
+        onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+        InputProps={{ startAdornment: <InputAdornment position="start"><SearchRoundedIcon /></InputAdornment> }}
       />
 
-      <TableContainer
-        component={Paper}
-        variant="outlined"
-      >
-        <Table>
+      <TableContainer component={Paper} variant="outlined" sx={{ overflow: 'hidden' }}>
+        <Table sx={{ minWidth: 950 }}>
           <TableHead>
             <TableRow>
-              <TableCell>
-                Código
-              </TableCell>
-
-              <TableCell>
-                Producto
-              </TableCell>
-
-              <TableCell>
-                Presentación
-              </TableCell>
-
-              <TableCell>
-                Rubro
-              </TableCell>
-
-              <TableCell align="right">
-                Precio S/IVA
-              </TableCell>
-
-              <TableCell align="right">
-                Acción
-              </TableCell>
+              <TableCell>Código</TableCell>
+              <TableCell>Producto</TableCell>
+              <TableCell>Presentación</TableCell>
+              <TableCell>Rubro</TableCell>
+              <TableCell align="right">Stock</TableCell>
+              <TableCell align="right">Precio S/IVA</TableCell>
+              <TableCell align="right">Acciones</TableCell>
             </TableRow>
           </TableHead>
-
           <TableBody>
-            {visible.map(
-              (product) => (
-                <TableRow
-                  key={product.id}
-                  hover
-                >
-                  <TableCell>
-                    <Chip
-                      label={
-                        product.codigo
-                      }
-                      size="small"
-                      variant="outlined"
-                    />
-                  </TableCell>
-
-                  <TableCell>
-                    <Typography
-                      fontWeight={700}
-                    >
-                      {
-                        product.nombre
-                      }
-                    </Typography>
-                  </TableCell>
-
-                  <TableCell>
-                    {normalizePresentation(
-                      product.presentacion
-                    ) || '—'}
-                  </TableCell>
-
-                  <TableCell>
-                    {product.rubro}
-                  </TableCell>
-
-                  <TableCell align="right">
-                    <Typography
-                      fontWeight={800}
-                    >
-                      {formatPrice(
-                        finalSinIva(
-                          product
-                        )
-                      )}
-                    </Typography>
-                  </TableCell>
-
-                  <TableCell align="right">
-                    <Button
-                      size="small"
-                      startIcon={
-                        <EditRoundedIcon />
-                      }
-                      onClick={() => {
-                        setSelected(
-                          product
-                        );
-
-                        setDialogOpen(
-                          true
-                        );
-                      }}
-                    >
-                      Editar
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              )
-            )}
+            {visible.map((product) => (
+              <TableRow key={product.id} hover>
+                <TableCell><Chip label={product.codigo} size="small" variant="outlined" sx={{ fontFamily: 'monospace' }} /></TableCell>
+                <TableCell><Typography fontWeight={780}>{product.nombre}</Typography></TableCell>
+                <TableCell>{normalizePresentation(product.presentacion) || '—'}</TableCell>
+                <TableCell><Typography variant="body2" color="text.secondary">{product.rubro}</Typography></TableCell>
+                <TableCell align="right">{product.stock === null ? 'Consultar' : product.stock}</TableCell>
+                <TableCell align="right"><Typography fontWeight={850}>{formatPrice(finalSinIva(product))}</Typography></TableCell>
+                <TableCell align="right">
+                  <Tooltip title="Editar"><IconButton onClick={() => { setSelected(product); setDialogOpen(true); }}><EditRoundedIcon /></IconButton></Tooltip>
+                  <Tooltip title="Desactivar"><IconButton color="error" onClick={() => deactivate(product)}><DeleteOutlineRoundedIcon /></IconButton></Tooltip>
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
-
           <TablePagination
             component="div"
             count={filtered.length}
             page={page}
             rowsPerPage={rows}
-            onPageChange={(
-              _,
-              next
-            ) =>
-              setPage(next)
-            }
-            onRowsPerPageChange={(
-              event
-            ) => {
-              setRows(
-                Number(
-                  event.target.value
-                )
-              );
-
-              setPage(0);
-            }}
-            rowsPerPageOptions={[
-              25,
-              50,
-              100
-            ]}
+            onPageChange={(_, next) => setPage(next)}
+            onRowsPerPageChange={(e) => { setRows(Number(e.target.value)); setPage(0); }}
+            rowsPerPageOptions={[25, 50, 100]}
+            labelRowsPerPage="Mostrar"
+            labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
           />
         </Table>
       </TableContainer>
@@ -1026,575 +370,305 @@ function ProductsView({
       <ProductDialog
         open={dialogOpen}
         product={selected}
-        onClose={() =>
-          setDialogOpen(false)
-        }
+        onClose={() => setDialogOpen(false)}
         onSaved={refresh}
       />
-
     </Stack>
   );
 }
 
-
-/* =========================================================
-   IMPORTAR EXCEL
-========================================================= */
-
-function ImportView({
-  products,
-  refresh
-}) {
-  const [file, setFile] =
-    React.useState(null);
-
-  const [loading, setLoading] =
-    React.useState(false);
-
-  const [message, setMessage] =
-    React.useState(null);
+function ImportView({ products, refresh }) {
+  const [file, setFile] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [message, setMessage] = React.useState(null);
 
   const importar = async () => {
-    if (!file) {
-      return;
-    }
-
+    if (!file) return;
     setLoading(true);
     setMessage(null);
-
     try {
-      const incoming =
-        await parseExcel(
-          file,
-          products
-        );
+      const incoming = await parseExcel(file, products);
+      const { error: disableError } = await supabase
+        .from('products')
+        .update({ activo: false, updated_at: new Date().toISOString() })
+        .eq('activo', true);
+      if (disableError) throw disableError;
 
-      /*
-       * Lista nueva completa:
-       * primero desactivamos
-       * productos anteriores.
-       */
-      const {
-        error:
-          disableError
-      } =
-        await supabase
-          .from('products')
-          .update({
-            activo: false,
-            updated_at:
-              new Date()
-                .toISOString()
-          })
-          .eq(
-            'activo',
-            true
-          );
-
-      if (disableError) {
-        throw disableError;
-      }
-
-      for (
-        const product of
-        incoming
-      ) {
-        const row =
-          toDatabase(
-            product
-          );
-
+      for (const product of incoming) {
+        const row = toDatabase(product);
         if (product.id) {
-          const {
-            error
-          } =
-            await supabase
-              .from(
-                'products'
-              )
-              .update(row)
-              .eq(
-                'id',
-                product.id
-              );
-
-          if (error) {
-            throw error;
-          }
+          const { error } = await supabase.from('products').update(row).eq('id', product.id);
+          if (error) throw error;
         } else {
-          const {
-            error
-          } =
-            await supabase
-              .from(
-                'products'
-              )
-              .insert(row);
-
-          if (error) {
-            throw error;
-          }
+          const { error } = await supabase.from('products').insert(row);
+          if (error) throw error;
         }
       }
 
       await refresh();
-
-      setMessage({
-        type: 'success',
-
-        text:
-          `Lista actualizada correctamente. ` +
-          `${incoming.length} productos procesados.`
-      });
-
+      setMessage({ type: 'success', text: `Lista actualizada correctamente. ${incoming.length.toLocaleString('es-AR')} productos procesados.` });
       setFile(null);
     } catch (err) {
-      console.error(err);
-
-      setMessage({
-        type: 'error',
-
-        text:
-          err?.message ||
-          'No se pudo importar el archivo.'
-      });
+      setMessage({ type: 'error', text: err?.message || 'No se pudo importar el archivo.' });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={2.5}>
       <Box>
-        <Typography
-          variant="h5"
-          fontWeight={900}
-        >
-          Actualizar lista
-        </Typography>
-
-        <Typography
-          color="text.secondary"
-          sx={{ mt: 0.5 }}
-        >
-          Cargá el Excel nuevo de
-          POLCARFER. El sistema
-          actualiza automáticamente
-          la lista que ven los
-          clientes.
+        <Typography variant="h5">Actualizar lista de precios</Typography>
+        <Typography color="text.secondary" sx={{ mt: .5 }}>
+          Subí la nueva lista de POLCARFER. El sistema interpreta los productos, normaliza presentaciones y publica los cambios.
         </Typography>
       </Box>
 
-      {message && (
-        <Alert
-          severity={message.type}
-        >
-          {message.text}
-        </Alert>
-      )}
+      {message && <Alert severity={message.type}>{message.text}</Alert>}
 
       <Paper
         variant="outlined"
-        sx={{ p: 3 }}
+        sx={{
+          p: { xs: 3, md: 4 },
+          borderStyle: 'dashed',
+          borderWidth: 1.5,
+          borderColor: file ? 'rgba(67,181,129,.45)' : 'rgba(255,255,255,.13)',
+          textAlign: 'center',
+          bgcolor: file ? 'rgba(67,181,129,.025)' : 'rgba(255,255,255,.01)'
+        }}
       >
-        <Stack spacing={2.5}>
-
-          <Typography
-            variant="h6"
-          >
-            Seleccionar lista
-          </Typography>
-
-          <Button
-            component="label"
-            variant="outlined"
-            startIcon={
-              <UploadFileRoundedIcon />
-            }
-            sx={{
-              alignSelf:
-                'flex-start'
-            }}
-          >
-            {file
-              ? file.name
-              : 'Seleccionar Excel'}
-
-            <input
-              hidden
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={(
-                event
-              ) =>
-                setFile(
-                  event.target
-                    .files?.[0] ||
-                    null
-                )
-              }
-            />
+        <Stack alignItems="center" spacing={2}>
+          <Box sx={{ width: 64, height: 64, borderRadius: 3, bgcolor: 'rgba(255,138,61,.10)', color: 'primary.main', display: 'grid', placeItems: 'center' }}>
+            {file ? <DescriptionOutlinedIcon sx={{ fontSize: 32 }} /> : <UploadFileRoundedIcon sx={{ fontSize: 32 }} />}
+          </Box>
+          <Box>
+            <Typography variant="h6">{file ? file.name : 'Seleccioná la nueva lista Excel'}</Typography>
+            <Typography color="text.secondary" sx={{ mt: .5 }}>
+              Formatos admitidos: .xlsx y .xls · Los códigos repetidos están permitidos.
+            </Typography>
+          </Box>
+          <Button component="label" variant={file ? 'outlined' : 'contained'} startIcon={<UploadFileRoundedIcon />}>
+            {file ? 'Cambiar archivo' : 'Seleccionar Excel'}
+            <input hidden type="file" accept=".xlsx,.xls" onChange={(e) => setFile(e.target.files?.[0] || null)} />
           </Button>
-
-          <Divider />
-
-          <Alert
-            severity="info"
-            variant="outlined"
-          >
-            Los códigos repetidos
-            están permitidos. Cada
-            producto utiliza su ID
-            interno de Supabase.
-          </Alert>
-
-          <Button
-            variant="contained"
-            size="large"
-            disabled={
-              !file || loading
-            }
-            onClick={importar}
-            sx={{
-              alignSelf:
-                'flex-start'
-            }}
-          >
-            {loading
-              ? 'Actualizando lista...'
-              : 'Actualizar lista'}
-          </Button>
-
         </Stack>
       </Paper>
 
-      <Button
-        variant="outlined"
-        startIcon={
-          <DownloadRoundedIcon />
-        }
-        sx={{
-          alignSelf:
-            'flex-start'
-        }}
-        onClick={() =>
-          exportExcel(products)
-        }
-      >
-        Exportar lista actual
-      </Button>
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, md: 8 }}>
+          <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+            <Typography fontWeight={800}>¿Qué va a hacer el sistema?</Typography>
+            <Stack spacing={1.1} sx={{ mt: 1.7 }}>
+              {[
+                'Actualizar los productos que ya existen.',
+                'Crear automáticamente los productos nuevos.',
+                'Admitir códigos comerciales repetidos usando el ID interno.',
+                'Normalizar presentaciones simples como “12” → “12 unidades”.',
+                'Dejar fuera de la lista pública los productos que ya no aparecen.'
+              ].map((text) => (
+                <Stack key={text} direction="row" spacing={1} alignItems="flex-start">
+                  <CheckCircleRoundedIcon color="success" fontSize="small" sx={{ mt: .15 }} />
+                  <Typography variant="body2" color="text.secondary">{text}</Typography>
+                </Stack>
+              ))}
+            </Stack>
+          </Paper>
+        </Grid>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Paper variant="outlined" sx={{ p: 2.5, height: '100%', bgcolor: '#0b1621' }}>
+            <Typography variant="overline" color="text.secondary">CATÁLOGO ACTUAL</Typography>
+            <Typography variant="h4" sx={{ mt: .5 }}>{products.length.toLocaleString('es-AR')}</Typography>
+            <Typography color="text.secondary">productos publicados</Typography>
+            <Button
+              fullWidth
+              size="large"
+              variant="contained"
+              disabled={!file || loading}
+              onClick={importar}
+              sx={{ mt: 2.5 }}
+            >
+              {loading ? 'Actualizando…' : 'Publicar nueva lista'}
+            </Button>
+          </Paper>
+        </Grid>
+      </Grid>
 
+      <Button variant="outlined" startIcon={<DownloadRoundedIcon />} sx={{ alignSelf: 'flex-start' }} onClick={() => exportAdminExcel(products)}>
+        Exportar catálogo actual
+      </Button>
     </Stack>
   );
 }
 
+function StatCard({ icon: Icon, label, value, helper }) {
+  return (
+    <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+      <Stack direction="row" spacing={1.6} alignItems="flex-start">
+        <Box sx={{ width: 44, height: 44, borderRadius: 2.3, bgcolor: 'rgba(255,138,61,.09)', color: 'primary.main', display: 'grid', placeItems: 'center' }}>
+          <Icon fontSize="small" />
+        </Box>
+        <Box>
+          <Typography variant="h5">{value}</Typography>
+          <Typography fontWeight={750} sx={{ mt: .3 }}>{label}</Typography>
+          <Typography variant="caption" color="text.secondary">{helper}</Typography>
+        </Box>
+      </Stack>
+    </Paper>
+  );
+}
 
-/* =========================================================
-   COMPONENTE PRINCIPAL
-========================================================= */
+function Dashboard({ products, onNavigate }) {
+  const rubros = React.useMemo(() => new Set(products.map((p) => p.rubro).filter(Boolean)).size, [products]);
+  const discounts = React.useMemo(() => products.filter((p) => p.tieneDescuento).length, [products]);
+  const withStock = React.useMemo(() => products.filter((p) => p.stock !== null).length, [products]);
 
-export default function PartnerAccessView({
-  products,
-  onCatalogChanged
-}) {
-  const [
-    checking,
-    setChecking
-  ] = React.useState(true);
+  return (
+    <Stack spacing={2.5}>
+      <Box>
+        <Typography variant="overline" color="primary.main">RESUMEN</Typography>
+        <Typography variant="h4" sx={{ mt: .3 }}>Panel de socios</Typography>
+        <Typography color="text.secondary" sx={{ mt: .6 }}>Estado actual del catálogo que utilizan los clientes.</Typography>
+      </Box>
 
-  const [
-    session,
-    setSession
-  ] = React.useState(null);
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, sm: 6, xl: 3 }}><StatCard icon={Inventory2OutlinedIcon} value={products.length.toLocaleString('es-AR')} label="Productos" helper="activos en el catálogo" /></Grid>
+        <Grid size={{ xs: 12, sm: 6, xl: 3 }}><StatCard icon={CategoryOutlinedIcon} value={rubros} label="Rubros" helper="categorías disponibles" /></Grid>
+        <Grid size={{ xs: 12, sm: 6, xl: 3 }}><StatCard icon={SellOutlinedIcon} value={discounts.toLocaleString('es-AR')} label="Con descuento" helper="ofertas activas" /></Grid>
+        <Grid size={{ xs: 12, sm: 6, xl: 3 }}><StatCard icon={CloudDoneOutlinedIcon} value={withStock.toLocaleString('es-AR')} label="Con stock cargado" helper="productos con cantidad informada" /></Grid>
+      </Grid>
 
-  const [tab, setTab] =
-    React.useState('home');
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Paper variant="outlined" sx={{ p: 3, height: '100%', background: 'linear-gradient(135deg, rgba(255,138,61,.07), rgba(255,255,255,.012))' }}>
+            <Typography variant="h6">Actualizar lista de precios</Typography>
+            <Typography color="text.secondary" sx={{ mt: .8, mb: 2.4, lineHeight: 1.6 }}>
+              Importá el Excel nuevo y publicá los cambios en el catálogo de clientes.
+            </Typography>
+            <Button variant="contained" startIcon={<UploadFileRoundedIcon />} onClick={() => onNavigate('import')}>Actualizar lista</Button>
+          </Paper>
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Paper variant="outlined" sx={{ p: 3, height: '100%' }}>
+            <Typography variant="h6">Modificar un producto</Typography>
+            <Typography color="text.secondary" sx={{ mt: .8, mb: 2.4, lineHeight: 1.6 }}>
+              Buscá por código o descripción y cambiá precio, presentación, rubro o stock.
+            </Typography>
+            <Button variant="outlined" startIcon={<EditRoundedIcon />} onClick={() => onNavigate('products')}>Gestionar productos</Button>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      <Alert severity="success" variant="outlined" icon={<CloudDoneOutlinedIcon />}>
+        Los cambios guardados en este panel utilizan la misma base de datos que la Lista de precios y Pedidos.
+      </Alert>
+    </Stack>
+  );
+}
+
+const NAV_ITEMS = [
+  ['dashboard', 'Resumen', DashboardRoundedIcon],
+  ['products', 'Productos', Inventory2OutlinedIcon],
+  ['import', 'Actualizar lista', UploadFileRoundedIcon]
+];
+
+export default function PartnerAccessView({ products, onCatalogChanged }) {
+  const [checking, setChecking] = React.useState(true);
+  const [session, setSession] = React.useState(null);
+  const [section, setSection] = React.useState('dashboard');
+  const mobile = useMediaQuery('(max-width:900px)');
 
   React.useEffect(() => {
     let active = true;
-
     async function check() {
-      if (
-        !isSupabaseConfigured
-      ) {
-        if (active) {
-          setChecking(false);
-        }
-
+      if (!isSupabaseConfigured) {
+        if (active) setChecking(false);
         return;
       }
-
-      const {
-        data
-      } =
-        await supabase.auth
-          .getSession();
-
-      if (
-        !data.session
-      ) {
-        if (active) {
-          setSession(null);
-          setChecking(false);
-        }
-
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        if (active) { setSession(null); setChecking(false); }
         return;
       }
-
-      const socio =
-        await comprobarSocio();
-
-      if (
-        active &&
-        socio
-      ) {
-        setSession(
-          data.session
-        );
-      } else {
-        await supabase.auth.signOut();
-      }
-
-      if (active) {
-        setChecking(false);
-      }
+      const socio = await comprobarSocio();
+      if (active && socio) setSession(data.session);
+      else await supabase.auth.signOut();
+      if (active) setChecking(false);
     }
-
     check();
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
   if (checking) {
-    return (
-      <Stack
-        alignItems="center"
-        sx={{ py: 12 }}
-      >
-        <CircularProgress />
-      </Stack>
-    );
+    return <Stack alignItems="center" justifyContent="center" sx={{ minHeight: 420 }}><CircularProgress /></Stack>;
   }
 
-  if (!session) {
-    return (
-      <LoginSocio
-        onSuccess={(
-          newSession
-        ) =>
-          setSession(
-            newSession
-          )
-        }
-      />
-    );
-  }
+  if (!session) return <LoginSocio onSuccess={setSession} />;
 
   return (
-    <Stack spacing={3}>
-
-      <Stack
-        direction={{
-          xs: 'column',
-          md: 'row'
-        }}
-        justifyContent="space-between"
-        alignItems={{
-          md: 'center'
-        }}
-        gap={2}
-      >
-        <Box>
-          <Typography
-            variant="h4"
-            fontWeight={900}
-          >
-            Sistema de socios
-          </Typography>
-
-          <Typography
-            color="text.secondary"
-            sx={{ mt: 0.5 }}
-          >
-            Administración del
-            catálogo POLCARFER.
-          </Typography>
-        </Box>
-
-        <Button
-          color="inherit"
-          startIcon={
-            <LogoutRoundedIcon />
-          }
-          onClick={async () => {
-            await supabase.auth.signOut();
-
-            setSession(null);
-            setTab('home');
+    <Grid container spacing={2.2} alignItems="flex-start">
+      <Grid size={{ xs: 12, md: 3, lg: 2.35 }}>
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 1.4,
+            position: { md: 'sticky' },
+            top: { md: 92 },
+            bgcolor: '#0b1621'
           }}
         >
-          Cerrar sesión
-        </Button>
-      </Stack>
-
-      <Paper variant="outlined">
-        <Tabs
-          value={tab}
-          onChange={(
-            _,
-            newValue
-          ) =>
-            setTab(newValue)
-          }
-          variant="scrollable"
-          scrollButtons="auto"
-        >
-          <Tab
-            value="home"
-            label="Inicio"
-          />
-
-          <Tab
-            value="products"
-            label="Productos"
-          />
-
-          <Tab
-            value="import"
-            label="Actualizar lista"
-          />
-        </Tabs>
-      </Paper>
-
-      {tab === 'products' && (
-        <ProductsView
-          products={products}
-          refresh={
-            onCatalogChanged
-          }
-        />
-      )}
-
-      {tab === 'import' && (
-        <ImportView
-          products={products}
-          refresh={
-            onCatalogChanged
-          }
-        />
-      )}
-
-      {tab === 'home' && (
-        <Stack spacing={2}>
-
-          <Paper
-            variant="outlined"
-            sx={{ p: 3 }}
-          >
-            <Typography
-              color="text.secondary"
-            >
-              Productos publicados
-            </Typography>
-
-            <Typography
-              variant="h3"
-              fontWeight={900}
-              sx={{ mt: 1 }}
-            >
-              {products.length.toLocaleString(
-                'es-AR'
-              )}
-            </Typography>
-          </Paper>
-
-          <Stack
-            direction={{
-              xs: 'column',
-              md: 'row'
-            }}
-            spacing={2}
-          >
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 3,
-                flex: 1
+          <Stack spacing={1}>
+            <Box sx={{ p: 1.3 }}>
+              <Stack direction="row" spacing={1.2} alignItems="center">
+                <Avatar sx={{ width: 38, height: 38, bgcolor: 'rgba(255,138,61,.14)', color: 'primary.main', fontWeight: 900 }}>S</Avatar>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography fontWeight={850}>Socio POLCARFER</Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap>{session.user?.email}</Typography>
+                </Box>
+              </Stack>
+            </Box>
+            <Divider />
+            <Stack direction={mobile ? 'row' : 'column'} spacing={.6} sx={{ overflowX: 'auto' }}>
+              {NAV_ITEMS.map(([id, label, Icon]) => (
+                <Button
+                  key={id}
+                  fullWidth={!mobile}
+                  color={section === id ? 'primary' : 'inherit'}
+                  variant={section === id ? 'contained' : 'text'}
+                  startIcon={<Icon />}
+                  onClick={() => setSection(id)}
+                  sx={{ justifyContent: 'flex-start', whiteSpace: 'nowrap' }}
+                >
+                  {label}
+                </Button>
+              ))}
+            </Stack>
+            <Divider />
+            <Button
+              fullWidth
+              color="inherit"
+              startIcon={<LogoutRoundedIcon />}
+              onClick={async () => {
+                await supabase.auth.signOut();
+                setSession(null);
+                setSection('dashboard');
               }}
+              sx={{ justifyContent: 'flex-start', color: 'text.secondary' }}
             >
-              <Typography
-                variant="h6"
-              >
-                Gestionar productos
-              </Typography>
-
-              <Typography
-                color="text.secondary"
-                sx={{
-                  mt: 1,
-                  mb: 2
-                }}
-              >
-                Modificá precios,
-                presentaciones,
-                stock y demás datos.
-              </Typography>
-
-              <Button
-                variant="contained"
-                onClick={() =>
-                  setTab(
-                    'products'
-                  )
-                }
-              >
-                Ver productos
-              </Button>
-            </Paper>
-
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 3,
-                flex: 1
-              }}
-            >
-              <Typography
-                variant="h6"
-              >
-                Nueva lista
-              </Typography>
-
-              <Typography
-                color="text.secondary"
-                sx={{
-                  mt: 1,
-                  mb: 2
-                }}
-              >
-                Importá directamente
-                el nuevo Excel de
-                POLCARFER.
-              </Typography>
-
-              <Button
-                variant="outlined"
-                onClick={() =>
-                  setTab(
-                    'import'
-                  )
-                }
-              >
-                Actualizar lista
-              </Button>
-            </Paper>
+              Cerrar sesión
+            </Button>
           </Stack>
+        </Paper>
+      </Grid>
 
-        </Stack>
-      )}
-
-    </Stack>
+      <Grid size={{ xs: 12, md: 9, lg: 9.65 }}>
+        {section === 'products' ? (
+          <ProductsView products={products} refresh={onCatalogChanged} />
+        ) : section === 'import' ? (
+          <ImportView products={products} refresh={onCatalogChanged} />
+        ) : (
+          <Dashboard products={products} onNavigate={setSection} />
+        )}
+      </Grid>
+    </Grid>
   );
 }

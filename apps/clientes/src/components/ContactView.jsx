@@ -4,13 +4,127 @@ import PhoneRoundedIcon from '@mui/icons-material/PhoneRounded';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import LocationOnRoundedIcon from '@mui/icons-material/LocationOnRounded';
 import MailOutlineRoundedIcon from '@mui/icons-material/MailOutlineRounded';
-import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
+import ArrowOutwardRoundedIcon from '@mui/icons-material/ArrowOutwardRounded';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { CONTACT } from '../lib/catalogUtils.js';
 
-const items=[
- ['Teléfono',CONTACT.phone,'Llamar o escribir por WhatsApp',`https://wa.me/${CONTACT.whatsapp}`,PhoneRoundedIcon],
- ['Instagram',CONTACT.instagram,'Novedades y productos',CONTACT.instagramUrl,InstagramIcon],
- ['Ubicación','Federico Chopin 458','Lomas de Zamora, Buenos Aires',CONTACT.mapUrl,LocationOnRoundedIcon],
- ['Correo',CONTACT.email,'Consultas y documentación',`mailto:${CONTACT.email}`,MailOutlineRoundedIcon]
+const ITEMS = [
+  {
+    title: 'Teléfono',
+    value: CONTACT.phone,
+    desc: 'Consultas comerciales y pedidos.',
+    url: `https://wa.me/${CONTACT.whatsapp}`,
+    cta: 'Abrir WhatsApp',
+    Icon: PhoneRoundedIcon
+  },
+  {
+    title: 'Instagram',
+    value: CONTACT.instagram,
+    desc: 'Novedades, productos e información de la distribuidora.',
+    url: CONTACT.instagramUrl,
+    cta: 'Ver Instagram',
+    Icon: InstagramIcon
+  },
+  {
+    title: 'Ubicación',
+    value: 'Federico Chopin 458',
+    desc: 'Lomas de Zamora, Buenos Aires.',
+    url: CONTACT.mapUrl,
+    cta: 'Abrir ubicación',
+    Icon: LocationOnRoundedIcon
+  },
+  {
+    title: 'Correo comercial',
+    value: CONTACT.email,
+    desc: 'Documentación y consultas administrativas.',
+    url: `mailto:${CONTACT.email}`,
+    cta: 'Enviar correo',
+    Icon: MailOutlineRoundedIcon
+  }
 ];
-export default function ContactView(){return <Stack spacing={3}><Box><Typography variant="h4">Contacto</Typography><Typography color="text.secondary" sx={{mt:.7}}>Elegí el canal que te resulte más cómodo.</Typography></Box><Grid container spacing={2}>{items.map(([title,value,desc,url,Icon])=><Grid key={title} size={{xs:12,sm:6}}><Paper variant="outlined" sx={{p:3,height:'100%'}}><Box sx={{width:46,height:46,borderRadius:2,bgcolor:'rgba(255,138,61,.10)',display:'grid',placeItems:'center',mb:2.5}}><Icon color="primary"/></Box><Typography variant="overline" color="text.secondary" fontWeight={800}>{title}</Typography><Typography variant="h6" sx={{mt:.4}}>{value}</Typography><Typography color="text.secondary" sx={{mt:.7}}>{desc}</Typography><Button component="a" href={url} target={url.startsWith('http')?'_blank':undefined} rel="noopener" endIcon={<OpenInNewRoundedIcon/>} sx={{mt:2,px:0}}>Abrir</Button></Paper></Grid>)}</Grid></Stack>}
+
+export default function ContactView() {
+  return (
+    <Stack spacing={3}>
+      <Paper
+        variant="outlined"
+        sx={{
+          p: { xs: 3, md: 4 },
+          background: 'linear-gradient(135deg, rgba(255,138,61,.08), rgba(255,255,255,.015))'
+        }}
+      >
+        <Grid container spacing={3} alignItems="center">
+          <Grid size={{ xs: 12, md: 8 }}>
+            <Typography variant="overline" color="primary.main">CONTACTO DIRECTO</Typography>
+            <Typography variant="h4" sx={{ mt: .4 }}>¿Necesitás hablar con POLCARFER?</Typography>
+            <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 680, lineHeight: 1.65 }}>
+              Elegí el canal que te resulte más cómodo. Para pedidos y disponibilidad, WhatsApp es la vía más rápida.
+            </Typography>
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Button
+              fullWidth
+              size="large"
+              variant="contained"
+              component="a"
+              href={`https://wa.me/${CONTACT.whatsapp}`}
+              target="_blank"
+              rel="noopener"
+              startIcon={<WhatsAppIcon />}
+            >
+              Hablar por WhatsApp
+            </Button>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      <Grid container spacing={2}>
+        {ITEMS.map(({ title, value, desc, url, cta, Icon }) => (
+          <Grid key={title} size={{ xs: 12, sm: 6 }}>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 3,
+                height: '100%',
+                transition: '.2s',
+                '&:hover': { borderColor: 'rgba(255,138,61,.3)', transform: 'translateY(-2px)' }
+              }}
+            >
+              <Stack direction="row" spacing={2} alignItems="flex-start">
+                <Box
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 2.5,
+                    bgcolor: 'rgba(255,138,61,.10)',
+                    color: 'primary.main',
+                    display: 'grid',
+                    placeItems: 'center',
+                    flexShrink: 0
+                  }}
+                >
+                  <Icon />
+                </Box>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="overline" color="text.secondary">{title}</Typography>
+                  <Typography variant="h6" sx={{ mt: .1, wordBreak: 'break-word' }}>{value}</Typography>
+                  <Typography color="text.secondary" sx={{ mt: .7 }}>{desc}</Typography>
+                  <Button
+                    component="a"
+                    href={url}
+                    target={url.startsWith('http') ? '_blank' : undefined}
+                    rel="noopener"
+                    endIcon={<ArrowOutwardRoundedIcon />}
+                    sx={{ mt: 1.8, px: 0 }}
+                  >
+                    {cta}
+                  </Button>
+                </Box>
+              </Stack>
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
+    </Stack>
+  );
+}

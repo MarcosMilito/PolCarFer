@@ -15,29 +15,17 @@ import {
   useMediaQuery
 } from '@mui/material';
 
-import MenuRoundedIcon
-  from '@mui/icons-material/MenuRounded';
+import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
-import LockOutlinedIcon
-  from '@mui/icons-material/LockOutlined';
-
-const nav = [
-  [
-    'home',
-    'Inicio'
-  ],
+const NAV = [
+  ['home', 'Inicio'],
   [
     'prices',
     'Lista de precios'
   ],
-  [
-    'orders',
-    'Pedido'
-  ],
-  [
-    'contact',
-    'Contacto'
-  ]
+  ['orders', 'Pedido'],
+  ['contact', 'Contacto']
 ];
 
 export default function AppShell({
@@ -56,66 +44,52 @@ export default function AppShell({
     setAnchor
   ] = React.useState(null);
 
-  const navigate = (
-    event,
-    id
-  ) => {
-    event.preventDefault();
-
-    onViewChange(id);
-
+  const choose = (id) => {
     setAnchor(null);
+    onViewChange(id);
   };
 
   return (
     <Box
       sx={{
         minHeight: '100vh',
-        background:
+        backgroundColor:
           '#0b0f14'
       }}
     >
       <AppBar
         position="sticky"
-        color="transparent"
         elevation={0}
         sx={{
+          backgroundColor:
+            'rgba(11,15,20,.96)',
           borderBottom:
             '1px solid',
           borderColor:
             'divider',
           backdropFilter:
-            'blur(14px)',
-          backgroundColor:
-            'rgba(11,15,20,.94)'
+            'blur(12px)'
         }}
       >
         <Toolbar
           sx={{
-            maxWidth: 1440,
             width: '100%',
+            maxWidth: 1440,
             mx: 'auto',
             gap: 2
           }}
         >
           <Stack
-            component="a"
-            href="#home"
-            onClick={(event) =>
-              navigate(
-                event,
-                'home'
-              )
-            }
             direction="row"
             spacing={1.2}
             alignItems="center"
+            onClick={() =>
+              choose('home')
+            }
             sx={{
               mr: 'auto',
               cursor: 'pointer',
-              color: 'inherit',
-              textDecoration:
-                'none'
+              userSelect: 'none'
             }}
           >
             <Box
@@ -175,33 +149,25 @@ export default function AppShell({
                   setAnchor(null)
                 }
               >
-                {nav.map(
+                {NAV.map(
                   ([
                     id,
                     label
                   ]) => (
                     <MenuItem
                       key={id}
-                      component="a"
-                      href={`#${id}`}
                       selected={
                         view === id
                       }
-                      onClick={(
-                        event
-                      ) =>
-                        navigate(
-                          event,
-                          id
-                        )
+                      onClick={() =>
+                        choose(id)
                       }
                     >
                       {label}
 
                       {id ===
                         'orders' &&
-                      cartCount >
-                        0
+                      cartCount > 0
                         ? ` (${cartCount})`
                         : ''}
                     </MenuItem>
@@ -211,30 +177,22 @@ export default function AppShell({
                 <Divider />
 
                 <MenuItem
-                  component="a"
-                  href="#partner"
                   selected={
                     view ===
                     'partner'
                   }
-                  onClick={(
-                    event
-                  ) =>
-                    navigate(
-                      event,
+                  onClick={() =>
+                    choose(
                       'partner'
                     )
                   }
                 >
                   <LockOutlinedIcon
                     fontSize="small"
-                    sx={{
-                      mr: 1
-                    }}
+                    sx={{ mr: 1 }}
                   />
 
-                  Ingresar al
-                  sistema
+                  Ingresar al sistema
                 </MenuItem>
               </Menu>
             </>
@@ -244,15 +202,13 @@ export default function AppShell({
               spacing={0.5}
               alignItems="center"
             >
-              {nav.map(
+              {NAV.map(
                 ([
                   id,
                   label
                 ]) => (
                   <Button
                     key={id}
-                    component="a"
-                    href={`#${id}`}
                     color={
                       view === id
                         ? 'primary'
@@ -263,18 +219,9 @@ export default function AppShell({
                         ? 'contained'
                         : 'text'
                     }
-                    onClick={(
-                      event
-                    ) =>
-                      navigate(
-                        event,
-                        id
-                      )
+                    onClick={() =>
+                      choose(id)
                     }
-                    sx={{
-                      textDecoration:
-                        'none'
-                    }}
                   >
                     {label}
 
@@ -288,8 +235,6 @@ export default function AppShell({
               )}
 
               <Button
-                component="a"
-                href="#partner"
                 startIcon={
                   <LockOutlinedIcon />
                 }
@@ -305,22 +250,16 @@ export default function AppShell({
                     ? 'contained'
                     : 'outlined'
                 }
-                onClick={(
-                  event
-                ) =>
-                  navigate(
-                    event,
+                onClick={() =>
+                  choose(
                     'partner'
                   )
                 }
-                sx={{
-                  ml: 1,
-                  textDecoration:
-                    'none'
-                }}
+                sx={{ ml: 1 }}
               >
-                Ingresar al
-                sistema
+                {view === 'partner'
+                  ? 'Sistema de socios'
+                  : 'Ingresar al sistema'}
               </Button>
             </Stack>
           )}

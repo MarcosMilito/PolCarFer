@@ -18,50 +18,29 @@ import {
   subscribeCatalog
 } from './lib/catalogService.js';
 
-const VALID_VIEWS = [
+const VALID_VIEWS = new Set([
   'home',
   'prices',
   'orders',
   'contact',
   'partner'
-];
-
-function getViewFromHash() {
-  const hash =
-    window.location.hash
-      .replace('#', '')
-      .trim();
-
-  return VALID_VIEWS.includes(hash)
-    ? hash
-    : 'home';
-}
+]);
 
 export default function App() {
   const [view, setView] =
-    React.useState(
-      getViewFromHash
-    );
+    React.useState('home');
 
-  const [
-    products,
-    setProducts
-  ] = React.useState([]);
+  const [products, setProducts] =
+    React.useState([]);
 
-  const [
-    source,
-    setSource
-  ] = React.useState('');
+  const [source, setSource] =
+    React.useState('');
 
-  const [
-    loading,
-    setLoading
-  ] = React.useState(true);
+  const [loading, setLoading] =
+    React.useState(true);
 
-  const [
-    error,
-    setError
-  ] = React.useState('');
+  const [error, setError] =
+    React.useState('');
 
   const [cart, setCart] =
     React.useState(() => {
@@ -77,64 +56,34 @@ export default function App() {
     });
 
   const refresh =
-    React.useCallback(
-      async () => {
-        try {
-          const result =
-            await loadCatalog();
+    React.useCallback(async () => {
+      try {
+        const result =
+          await loadCatalog();
 
-          setProducts(
-            result.products
-          );
-
-          setSource(
-            result.source
-          );
-
-          setError('');
-        } catch (err) {
-          console.error(err);
-
-          setError(
-            err.message ||
-              'Error de conexión'
-          );
-        } finally {
-          setLoading(false);
-        }
-      },
-      []
-    );
-
-  /*
-   * MUY IMPORTANTE:
-   *
-   * React escucha los cambios
-   * de #home, #prices,
-   * #partner, etc.
-   */
-  React.useEffect(() => {
-    const handleHashChange =
-      () => {
-        setView(
-          getViewFromHash()
+        setProducts(
+          result.products
         );
-      };
 
-    window.addEventListener(
-      'hashchange',
-      handleHashChange
-    );
+        setSource(
+          result.source
+        );
 
-    handleHashChange();
+        setError('');
+      } catch (err) {
+        console.error(
+          'Error catálogo POLCARFER:',
+          err
+        );
 
-    return () => {
-      window.removeEventListener(
-        'hashchange',
-        handleHashChange
-      );
-    };
-  }, []);
+        setError(
+          err?.message ||
+            'No se pudo cargar el catálogo.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    }, []);
 
   React.useEffect(() => {
     refresh();
@@ -144,27 +93,10 @@ export default function App() {
         refresh
       );
 
-    const onVisible = () => {
-      if (
-        document.visibilityState ===
-        'visible'
-      ) {
-        refresh();
-      }
-    };
-
-    document.addEventListener(
-      'visibilitychange',
-      onVisible
-    );
-
     return () => {
-      stop();
-
-      document.removeEventListener(
-        'visibilitychange',
-        onVisible
-      );
+      if (stop) {
+        stop();
+      }
     };
   }, [refresh]);
 
@@ -175,31 +107,26 @@ export default function App() {
     );
   }, [cart]);
 
-  const go = (id) => {
-    if (
-      !VALID_VIEWS.includes(id)
-    ) {
-      return;
-    }
+  const go =
+    React.useCallback(
+      (nextView) => {
+        if (
+          !VALID_VIEWS.has(
+            nextView
+          )
+        ) {
+          return;
+        }
 
-    const newHash =
-      `#${id}`;
+        setView(nextView);
 
-    if (
-      window.location.hash ===
-      newHash
-    ) {
-      setView(id);
-    } else {
-      window.location.hash =
-        newHash;
-    }
-
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
-  };
+        window.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
+      },
+      []
+    );
 
   let body;
 
@@ -258,19 +185,21 @@ export default function App() {
     );
   }
 
+  const cartCount =
+    cart.reduce(
+      (total, item) =>
+        total +
+        Number(
+          item.cantidad || 0
+        ),
+      0
+    );
+
   return (
     <AppShell
       view={view}
       onViewChange={go}
-      cartCount={cart.reduce(
-        (total, item) =>
-          total +
-          Number(
-            item.cantidad ||
-              0
-          ),
-        0
-      )}
+      cartCount={cartCount}
     >
       {error &&
         view !== 'home' && (

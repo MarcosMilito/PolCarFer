@@ -31,8 +31,8 @@ const theme = createTheme({
   },
   typography: {
     fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    h3: { fontWeight: 850, letterSpacing: '-.035em' },
-    h4: { fontWeight: 850, letterSpacing: '-.025em' },
+    h3: { fontWeight: 850, letterSpacing: '-.035em', fontSize: 'clamp(2rem, 5vw, 3.5rem)' },
+    h4: { fontWeight: 850, letterSpacing: '-.025em', fontSize: 'clamp(1.75rem, 4vw, 2.35rem)' },
     h5: { fontWeight: 800, letterSpacing: '-.015em' },
     h6: { fontWeight: 750 },
     button: { fontWeight: 800, textTransform: 'none' },
@@ -66,7 +66,7 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 11,
-          minHeight: 42,
+          minHeight: 44,
           paddingInline: 16
         }
       }

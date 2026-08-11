@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Button, Grid, Paper, Stack, Typography } from '@mui/material';
+import { Box, Button, Grid, Paper, Stack, Typography, useMediaQuery } from '@mui/material';
 import PhoneRoundedIcon from '@mui/icons-material/PhoneRounded';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import LocationOnRoundedIcon from '@mui/icons-material/LocationOnRounded';
@@ -44,20 +44,24 @@ const ITEMS = [
 ];
 
 export default function ContactView() {
+  const mobile = useMediaQuery('(max-width:700px)');
+
   return (
-    <Stack spacing={3}>
+    <Stack spacing={{ xs: 2, md: 3 }}>
       <Paper
         variant="outlined"
         sx={{
-          p: { xs: 3, md: 4 },
+          p: { xs: 2.25, sm: 3, md: 4 },
           background: 'linear-gradient(135deg, rgba(255,138,61,.08), rgba(255,255,255,.015))'
         }}
       >
-        <Grid container spacing={3} alignItems="center">
+        <Grid container spacing={{ xs: 2, md: 3 }} alignItems="center">
           <Grid size={{ xs: 12, md: 8 }}>
             <Typography variant="overline" color="primary.main">CONTACTO DIRECTO</Typography>
-            <Typography variant="h4" sx={{ mt: .4 }}>¿Necesitás hablar con POLCARFER?</Typography>
-            <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 680, lineHeight: 1.65 }}>
+            <Typography variant="h4" sx={{ mt: .35, fontSize: { xs: '1.75rem', sm: '2rem', md: '2.35rem' } }}>
+              ¿Necesitás hablar con POLCARFER?
+            </Typography>
+            <Typography color="text.secondary" sx={{ mt: .8, maxWidth: 680, lineHeight: 1.55 }}>
               Elegí el canal que te resulte más cómodo. Para pedidos y disponibilidad, WhatsApp es la vía más rápida.
             </Typography>
           </Grid>
@@ -71,6 +75,7 @@ export default function ContactView() {
               target="_blank"
               rel="noopener"
               startIcon={<WhatsAppIcon />}
+              sx={{ minHeight: 50 }}
             >
               Hablar por WhatsApp
             </Button>
@@ -78,24 +83,24 @@ export default function ContactView() {
         </Grid>
       </Paper>
 
-      <Grid container spacing={2}>
+      <Grid container spacing={{ xs: 1.25, sm: 2 }}>
         {ITEMS.map(({ title, value, desc, url, cta, Icon }) => (
           <Grid key={title} size={{ xs: 12, sm: 6 }}>
             <Paper
               variant="outlined"
               sx={{
-                p: 3,
+                p: { xs: 2, sm: 2.5, md: 3 },
                 height: '100%',
                 transition: '.2s',
-                '&:hover': { borderColor: 'rgba(255,138,61,.3)', transform: 'translateY(-2px)' }
+                '&:hover': { borderColor: 'rgba(255,138,61,.3)', transform: mobile ? 'none' : 'translateY(-2px)' }
               }}
             >
-              <Stack direction="row" spacing={2} alignItems="flex-start">
+              <Stack direction="row" spacing={1.5} alignItems="flex-start">
                 <Box
                   sx={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 2.5,
+                    width: { xs: 44, md: 48 },
+                    height: { xs: 44, md: 48 },
+                    borderRadius: 2.25,
                     bgcolor: 'rgba(255,138,61,.10)',
                     color: 'primary.main',
                     display: 'grid',
@@ -105,17 +110,18 @@ export default function ContactView() {
                 >
                   <Icon />
                 </Box>
-                <Box sx={{ minWidth: 0 }}>
+                <Box sx={{ minWidth: 0, flex: 1 }}>
                   <Typography variant="overline" color="text.secondary">{title}</Typography>
-                  <Typography variant="h6" sx={{ mt: .1, wordBreak: 'break-word' }}>{value}</Typography>
-                  <Typography color="text.secondary" sx={{ mt: .7 }}>{desc}</Typography>
+                  <Typography variant="h6" sx={{ mt: .05, wordBreak: 'break-word', fontSize: { xs: '1rem', md: '1.1rem' } }}>{value}</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: .55, lineHeight: 1.5 }}>{desc}</Typography>
                   <Button
+                    fullWidth={mobile}
                     component="a"
                     href={url}
                     target={url.startsWith('http') ? '_blank' : undefined}
                     rel="noopener"
                     endIcon={<ArrowOutwardRoundedIcon />}
-                    sx={{ mt: 1.8, px: 0 }}
+                    sx={{ mt: 1.4, px: mobile ? 1.5 : 0, justifyContent: mobile ? 'space-between' : 'flex-start', minHeight: 44 }}
                   >
                     {cta}
                   </Button>

@@ -80,13 +80,13 @@ function Metric({ icon: Icon, value, label }) {
 
 export default function HomeView({ onNavigate, count, source, error }) {
   return (
-    <Stack spacing={4}>
+    <Stack spacing={{ xs: 2.5, md: 4 }}>
       <Paper
         variant="outlined"
         sx={{
           position: 'relative',
           overflow: 'hidden',
-          p: { xs: 3, md: 5 },
+          p: { xs: 2.25, sm: 3, md: 5 },
           minHeight: { md: 390 },
           bgcolor: '#0b1621',
           backgroundImage:
@@ -118,7 +118,7 @@ export default function HomeView({ onNavigate, count, source, error }) {
                   variant="h3"
                   sx={{
                     maxWidth: 760,
-                    fontSize: { xs: '2.2rem', md: '3.5rem' },
+                    fontSize: { xs: '2rem', sm: '2.55rem', md: '3.5rem' },
                     lineHeight: 1.05
                   }}
                 >
@@ -137,6 +137,7 @@ export default function HomeView({ onNavigate, count, source, error }) {
                   variant="contained"
                   startIcon={<SearchRoundedIcon />}
                   onClick={() => onNavigate('prices')}
+                  sx={{ width: { xs: '100%', sm: 'auto' }, minHeight: 48 }}
                 >
                   Consultar precios
                 </Button>
@@ -145,6 +146,7 @@ export default function HomeView({ onNavigate, count, source, error }) {
                   variant="outlined"
                   startIcon={<ShoppingCartCheckoutRoundedIcon />}
                   onClick={() => onNavigate('orders')}
+                  sx={{ width: { xs: '100%', sm: 'auto' }, minHeight: 48 }}
                 >
                   Preparar pedido
                 </Button>
@@ -156,7 +158,7 @@ export default function HomeView({ onNavigate, count, source, error }) {
             <Paper
               variant="outlined"
               sx={{
-                p: 3,
+                p: { xs: 2.25, sm: 3 },
                 bgcolor: 'rgba(5,12,18,.72)',
                 backdropFilter: 'blur(10px)'
               }}
@@ -204,7 +206,7 @@ export default function HomeView({ onNavigate, count, source, error }) {
                 variant="outlined"
                 onClick={() => onNavigate(id)}
                 sx={{
-                  p: 3,
+                  p: { xs: 2.25, sm: 3 },
                   height: '100%',
                   cursor: 'pointer',
                   position: 'relative',
@@ -245,7 +247,7 @@ export default function HomeView({ onNavigate, count, source, error }) {
                 </Stack>
                 <Typography variant="h5" sx={{ mt: 3 }}>{title}</Typography>
                 <Typography color="text.secondary" sx={{ mt: 1.1, lineHeight: 1.6, minHeight: 52 }}>{desc}</Typography>
-                <Button endIcon={<ArrowForwardRoundedIcon />} sx={{ mt: 2.5, px: 0 }}>{cta}</Button>
+                <Button endIcon={<ArrowForwardRoundedIcon />} sx={{ mt: 2.25, px: 0, minHeight: 44 }}>{cta}</Button>
               </Paper>
             </Grid>
           ))}

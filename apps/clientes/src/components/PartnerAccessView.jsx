@@ -200,6 +200,7 @@ function LoginSocio({ onSuccess }) {
 }
 
 function ProductDialog({ open, product, onClose, onSaved }) {
+  const mobile = useMediaQuery('(max-width:700px)');
   const [form, setForm] = React.useState({});
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState('');
@@ -255,7 +256,7 @@ function ProductDialog({ open, product, onClose, onSaved }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" fullScreen={mobile}>
       <DialogTitle>{product ? 'Editar producto' : 'Nuevo producto'}</DialogTitle>
       <DialogContent>
         <Stack spacing={2.2} sx={{ pt: 1 }}>
@@ -274,15 +275,16 @@ function ProductDialog({ open, product, onClose, onSaved }) {
           </Grid>
         </Stack>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancelar</Button>
-        <Button variant="contained" disabled={saving} onClick={guardar}>{saving ? 'Guardando…' : 'Guardar cambios'}</Button>
+      <DialogActions sx={{ p: { xs: 2, md: 2 }, pb: { xs: 'calc(16px + env(safe-area-inset-bottom))', md: 2 }, flexDirection: { xs: 'column-reverse', sm: 'row' }, gap: 1 }}>
+        <Button fullWidth={mobile} onClick={onClose}>Cancelar</Button>
+        <Button fullWidth={mobile} variant="contained" disabled={saving} onClick={guardar}>{saving ? 'Guardando…' : 'Guardar cambios'}</Button>
       </DialogActions>
     </Dialog>
   );
 }
 
 function ProductsView({ products, refresh }) {
+  const mobile = useMediaQuery('(max-width:700px)');
   const [search, setSearch] = React.useState('');
   const [page, setPage] = React.useState(0);
   const [rows, setRows] = React.useState(25);
@@ -311,7 +313,7 @@ function ProductsView({ products, refresh }) {
           <Typography variant="h5">Gestión de productos</Typography>
           <Typography color="text.secondary" sx={{ mt: .4 }}>{filtered.length.toLocaleString('es-AR')} productos disponibles.</Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => { setSelected(null); setDialogOpen(true); }}>
+        <Button fullWidth={mobile} variant="contained" startIcon={<AddRoundedIcon />} onClick={() => { setSelected(null); setDialogOpen(true); }} sx={{ minHeight: 46 }}>
           Nuevo producto
         </Button>
       </Stack>
@@ -324,48 +326,104 @@ function ProductsView({ products, refresh }) {
         InputProps={{ startAdornment: <InputAdornment position="start"><SearchRoundedIcon /></InputAdornment> }}
       />
 
-      <TableContainer component={Paper} variant="outlined" sx={{ overflow: 'hidden' }}>
-        <Table sx={{ minWidth: 950 }}>
-          <TableHead>
-            <TableRow>
-              <TableCell>Código</TableCell>
-              <TableCell>Producto</TableCell>
-              <TableCell>Presentación</TableCell>
-              <TableCell>Rubro</TableCell>
-              <TableCell align="right">Stock</TableCell>
-              <TableCell align="right">Precio S/IVA</TableCell>
-              <TableCell align="right">Acciones</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {visible.map((product) => (
-              <TableRow key={product.id} hover>
-                <TableCell><Chip label={product.codigo} size="small" variant="outlined" sx={{ fontFamily: 'monospace' }} /></TableCell>
-                <TableCell><Typography fontWeight={780}>{product.nombre}</Typography></TableCell>
-                <TableCell>{normalizePresentation(product.presentacion) || '—'}</TableCell>
-                <TableCell><Typography variant="body2" color="text.secondary">{product.rubro}</Typography></TableCell>
-                <TableCell align="right">{product.stock === null ? 'Consultar' : product.stock}</TableCell>
-                <TableCell align="right"><Typography fontWeight={850}>{formatPrice(finalSinIva(product))}</Typography></TableCell>
-                <TableCell align="right">
-                  <Tooltip title="Editar"><IconButton onClick={() => { setSelected(product); setDialogOpen(true); }}><EditRoundedIcon /></IconButton></Tooltip>
-                  <Tooltip title="Desactivar"><IconButton color="error" onClick={() => deactivate(product)}><DeleteOutlineRoundedIcon /></IconButton></Tooltip>
-                </TableCell>
+      {mobile ? (
+        <Stack spacing={1}>
+          {visible.map((product) => (
+            <Paper key={product.id} variant="outlined" sx={{ p: 1.7, bgcolor: 'rgba(255,255,255,.012)' }}>
+              <Stack spacing={1.2}>
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1}>
+                  <Chip label={product.codigo} size="small" variant="outlined" sx={{ fontFamily: 'monospace', maxWidth: '60%' }} />
+                  <Stack direction="row" spacing={.4}>
+                    <IconButton aria-label="Editar producto" onClick={() => { setSelected(product); setDialogOpen(true); }} sx={{ width: 40, height: 40 }}>
+                      <EditRoundedIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton aria-label="Desactivar producto" color="error" onClick={() => deactivate(product)} sx={{ width: 40, height: 40 }}>
+                      <DeleteOutlineRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
+                </Stack>
+                <Box>
+                  <Typography fontWeight={820} sx={{ lineHeight: 1.35 }}>{product.nombre}</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: .45, lineHeight: 1.45 }}>
+                    {normalizePresentation(product.presentacion) || 'Presentación a consultar'}
+                  </Typography>
+                </Box>
+                <Stack direction="row" spacing={.65} flexWrap="wrap" useFlexGap>
+                  {product.rubro && <Chip label={product.rubro} size="small" variant="outlined" />}
+                  <Chip label={product.stock === null ? 'Stock: consultar' : `Stock: ${product.stock}`} size="small" variant="outlined" />
+                </Stack>
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-end" sx={{ pt: 1, borderTop: '1px solid rgba(255,255,255,.06)' }}>
+                  <Typography variant="caption" color="text.secondary">Precio S/IVA</Typography>
+                  <Typography fontWeight={900} color="primary.light">{formatPrice(finalSinIva(product))}</Typography>
+                </Stack>
+              </Stack>
+            </Paper>
+          ))}
+          {!visible.length && (
+            <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
+              <Typography fontWeight={800}>No encontramos productos</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: .5 }}>Probá con otro término.</Typography>
+            </Paper>
+          )}
+          <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+            <TablePagination
+              component="div"
+              count={filtered.length}
+              page={page}
+              rowsPerPage={rows}
+              onPageChange={(_, next) => setPage(next)}
+              onRowsPerPageChange={(e) => { setRows(Number(e.target.value)); setPage(0); }}
+              rowsPerPageOptions={[15, 25, 50]}
+              labelRowsPerPage="Por página"
+              labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+              sx={{ '.MuiTablePagination-toolbar': { px: 1, flexWrap: 'wrap', justifyContent: 'center' } }}
+            />
+          </Paper>
+        </Stack>
+      ) : (
+        <TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto' }}>
+          <Table sx={{ minWidth: 950 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Código</TableCell>
+                <TableCell>Producto</TableCell>
+                <TableCell>Presentación</TableCell>
+                <TableCell>Rubro</TableCell>
+                <TableCell align="right">Stock</TableCell>
+                <TableCell align="right">Precio S/IVA</TableCell>
+                <TableCell align="right">Acciones</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-          <TablePagination
-            component="div"
-            count={filtered.length}
-            page={page}
-            rowsPerPage={rows}
-            onPageChange={(_, next) => setPage(next)}
-            onRowsPerPageChange={(e) => { setRows(Number(e.target.value)); setPage(0); }}
-            rowsPerPageOptions={[25, 50, 100]}
-            labelRowsPerPage="Mostrar"
-            labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
-          />
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {visible.map((product) => (
+                <TableRow key={product.id} hover>
+                  <TableCell><Chip label={product.codigo} size="small" variant="outlined" sx={{ fontFamily: 'monospace' }} /></TableCell>
+                  <TableCell><Typography fontWeight={780}>{product.nombre}</Typography></TableCell>
+                  <TableCell>{normalizePresentation(product.presentacion) || '—'}</TableCell>
+                  <TableCell><Typography variant="body2" color="text.secondary">{product.rubro}</Typography></TableCell>
+                  <TableCell align="right">{product.stock === null ? 'Consultar' : product.stock}</TableCell>
+                  <TableCell align="right"><Typography fontWeight={850}>{formatPrice(finalSinIva(product))}</Typography></TableCell>
+                  <TableCell align="right">
+                    <Tooltip title="Editar"><IconButton onClick={() => { setSelected(product); setDialogOpen(true); }}><EditRoundedIcon /></IconButton></Tooltip>
+                    <Tooltip title="Desactivar"><IconButton color="error" onClick={() => deactivate(product)}><DeleteOutlineRoundedIcon /></IconButton></Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+            <TablePagination
+              component="div"
+              count={filtered.length}
+              page={page}
+              rowsPerPage={rows}
+              onPageChange={(_, next) => setPage(next)}
+              onRowsPerPageChange={(e) => { setRows(Number(e.target.value)); setPage(0); }}
+              rowsPerPageOptions={[25, 50, 100]}
+              labelRowsPerPage="Mostrar"
+              labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+            />
+          </Table>
+        </TableContainer>
+      )}
 
       <ProductDialog
         open={dialogOpen}
@@ -605,29 +663,30 @@ export default function PartnerAccessView({ products, onCatalogChanged }) {
   if (!session) return <LoginSocio onSuccess={setSession} />;
 
   return (
-    <Grid container spacing={2.2} alignItems="flex-start">
+    <Grid container spacing={{ xs: 1.4, md: 2.2 }} alignItems="flex-start">
       <Grid size={{ xs: 12, md: 3, lg: 2.35 }}>
         <Paper
           variant="outlined"
           sx={{
-            p: 1.4,
-            position: { md: 'sticky' },
-            top: { md: 92 },
+            p: { xs: 1, md: 1.4 },
+            position: { xs: 'sticky', md: 'sticky' },
+            top: { xs: 66, md: 92 },
+            zIndex: 6,
             bgcolor: '#0b1621'
           }}
         >
           <Stack spacing={1}>
-            <Box sx={{ p: 1.3 }}>
+            <Box sx={{ p: { xs: .8, md: 1.3 } }}>
               <Stack direction="row" spacing={1.2} alignItems="center">
                 <Avatar sx={{ width: 38, height: 38, bgcolor: 'rgba(255,138,61,.14)', color: 'primary.main', fontWeight: 900 }}>S</Avatar>
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography fontWeight={850}>Socio POLCARFER</Typography>
+                  <Typography fontWeight={850} sx={{ fontSize: { xs: '.92rem', md: '1rem' } }}>Socio POLCARFER</Typography>
                   <Typography variant="caption" color="text.secondary" noWrap>{session.user?.email}</Typography>
                 </Box>
               </Stack>
             </Box>
             <Divider />
-            <Stack direction={mobile ? 'row' : 'column'} spacing={.6} sx={{ overflowX: 'auto' }}>
+            <Stack direction={mobile ? 'row' : 'column'} spacing={.6} sx={{ overflowX: 'auto', pb: mobile ? .35 : 0, scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' } }}>
               {NAV_ITEMS.map(([id, label, Icon]) => (
                 <Button
                   key={id}
@@ -636,7 +695,7 @@ export default function PartnerAccessView({ products, onCatalogChanged }) {
                   variant={section === id ? 'contained' : 'text'}
                   startIcon={<Icon />}
                   onClick={() => setSection(id)}
-                  sx={{ justifyContent: 'flex-start', whiteSpace: 'nowrap' }}
+                  sx={{ justifyContent: 'flex-start', whiteSpace: 'nowrap', minHeight: 44, minWidth: mobile ? 'max-content' : undefined }}
                 >
                   {label}
                 </Button>
@@ -652,7 +711,7 @@ export default function PartnerAccessView({ products, onCatalogChanged }) {
                 setSession(null);
                 setSection('dashboard');
               }}
-              sx={{ justifyContent: 'flex-start', color: 'text.secondary' }}
+              sx={{ justifyContent: 'flex-start', color: 'text.secondary', minHeight: 44 }}
             >
               Cerrar sesión
             </Button>

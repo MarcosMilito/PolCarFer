@@ -26,7 +26,41 @@ import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import SellOutlinedIcon from '@mui/icons-material/SellOutlined';
-import { exportExcel, finalConIva, finalSinIva, formatPrice, normalizeText } from '../lib/catalogUtils.js';
+import { exportExcel, formatPrice, normalizeText } from '../lib/catalogUtils.js';
+
+function commercialPrice(value) {
+  return Number(value || 0) > 0 ? formatPrice(value) : 'Consultar';
+}
+
+function OfferSummary({ product, compact = false }) {
+  const offers = product.offers || [];
+  if (!offers.length) return null;
+
+  return (
+    <Stack spacing={.6} sx={{ mt: compact ? .6 : .8 }}>
+      {offers.map((offer, index) => (
+        <Box
+          key={offer.id || `${offer.condicion}-${offer.descuento}-${index}`}
+          sx={{
+            px: 1,
+            py: .7,
+            borderRadius: 1.5,
+            bgcolor: 'rgba(67,181,129,.055)',
+            border: '1px solid rgba(67,181,129,.14)'
+          }}
+        >
+          <Typography variant="caption" color="success.light" fontWeight={800}>
+            {offer.condicion || 'Oferta general'}
+            {offer.descuento > 0 ? ` · -${Number(offer.descuento * 100).toLocaleString('es-AR', { maximumFractionDigits: 2 })}%` : ''}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: .15 }}>
+            {Number(offer.precioSinIva || 0) > 0 ? `${formatPrice(offer.precioSinIva)} S/IVA` : 'Precio de oferta a consultar'}
+          </Typography>
+        </Box>
+      ))}
+    </Stack>
+  );
+}
 
 function MobileProductCard({ product }) {
   return (
@@ -39,8 +73,8 @@ function MobileProductCard({ product }) {
             variant="outlined"
             sx={{ fontFamily: 'monospace', maxWidth: '55%' }}
           />
-          {product.tieneDescuento && (
-            <Chip label={`-${Math.round(product.descuento * 100)}%`} size="small" color="success" />
+          {(product.offers || []).length > 0 && (
+            <Chip label={`${product.offers.length} oferta${product.offers.length === 1 ? '' : 's'}`} size="small" color="success" />
           )}
         </Stack>
 
@@ -70,16 +104,18 @@ function MobileProductCard({ product }) {
           <Box>
             <Typography variant="caption" color="text.secondary">Precio S/IVA</Typography>
             <Typography fontWeight={850} sx={{ mt: .2, fontSize: '.98rem' }}>
-              {formatPrice(finalSinIva(product))}
+              {commercialPrice(product.precioSinIva)}
             </Typography>
           </Box>
           <Box sx={{ textAlign: 'right' }}>
             <Typography variant="caption" color="text.secondary">Precio C/IVA</Typography>
             <Typography fontWeight={950} color="primary.light" sx={{ mt: .2, fontSize: '1.06rem' }}>
-              {formatPrice(finalConIva(product))}
+              {commercialPrice(product.precioConIva)}
             </Typography>
           </Box>
         </Box>
+
+        <OfferSummary product={product} compact />
       </Stack>
     </Paper>
   );
@@ -109,7 +145,7 @@ export default function PriceListView({ products }) {
     [products, search, rubro]
   );
 
-  const discountCount = React.useMemo(() => filtered.filter((p) => p.tieneDescuento).length, [filtered]);
+  const discountCount = React.useMemo(() => filtered.filter((p) => (p.offers || []).length > 0).length, [filtered]);
   React.useEffect(() => setPage(0), [search, rubro]);
   const visible = filtered.slice(page * rows, page * rows + rows);
 
@@ -176,7 +212,7 @@ export default function PriceListView({ products }) {
         <Chip icon={<Inventory2OutlinedIcon />} label={`${filtered.length.toLocaleString('es-AR')} productos`} variant="outlined" sx={{ flexShrink: 0 }} />
         <Chip icon={<FilterAltOutlinedIcon />} label={rubro || 'Todos los rubros'} variant="outlined" sx={{ flexShrink: 0 }} />
         {discountCount > 0 && (
-          <Chip icon={<SellOutlinedIcon />} label={`${discountCount} con descuento`} color="success" variant="outlined" sx={{ flexShrink: 0 }} />
+          <Chip icon={<SellOutlinedIcon />} label={`${discountCount} con ofertas`} color="success" variant="outlined" sx={{ flexShrink: 0 }} />
         )}
       </Stack>
 
@@ -217,8 +253,8 @@ export default function PriceListView({ products }) {
                 <TableCell sx={{ width: 135 }}>Código</TableCell>
                 <TableCell>Producto</TableCell>
                 <TableCell sx={{ width: 210 }}>Presentación</TableCell>
-                <TableCell align="right" sx={{ width: 155 }}>S/IVA</TableCell>
-                <TableCell align="right" sx={{ width: 165 }}>C/IVA</TableCell>
+                <TableCell align="right" sx={{ width: 155 }}>Base S/IVA</TableCell>
+                <TableCell align="right" sx={{ width: 165 }}>Base C/IVA</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -233,8 +269,9 @@ export default function PriceListView({ products }) {
                       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                         <Typography variant="caption" color="text.secondary">{p.rubro}</Typography>
                         {p.seccion && <Typography variant="caption" color="text.secondary">· {p.seccion}</Typography>}
-                        {p.tieneDescuento && <Chip label={`-${Math.round(p.descuento * 100)}%`} size="small" color="success" />}
+                        {(p.offers || []).length > 0 && <Chip label={`${p.offers.length} oferta${p.offers.length === 1 ? '' : 's'}`} size="small" color="success" />}
                       </Stack>
+                      <OfferSummary product={p} />
                     </Stack>
                   </TableCell>
                   <TableCell>
@@ -242,8 +279,8 @@ export default function PriceListView({ products }) {
                       {p.presentacion || 'Sin especificar'}
                     </Typography>
                   </TableCell>
-                  <TableCell align="right"><Typography fontWeight={850}>{formatPrice(finalSinIva(p))}</Typography></TableCell>
-                  <TableCell align="right"><Typography fontWeight={900} color="primary.light">{formatPrice(finalConIva(p))}</Typography></TableCell>
+                  <TableCell align="right"><Typography fontWeight={850}>{commercialPrice(p.precioSinIva)}</Typography></TableCell>
+                  <TableCell align="right"><Typography fontWeight={900} color="primary.light">{commercialPrice(p.precioConIva)}</Typography></TableCell>
                 </TableRow>
               ))}
               {!visible.length && (

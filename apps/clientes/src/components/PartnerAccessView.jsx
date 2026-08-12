@@ -65,6 +65,7 @@ import {
   setNewsActive,
   subscribeNews
 } from '../lib/newsService.js';
+import { replaceCatalogAtomic } from '../lib/catalogService.js';
 
 function toDatabase(product) {
   const p = normalizeProduct(product);
@@ -216,7 +217,7 @@ function ProductDialog({ open, product, onClose, onSaved }) {
   React.useEffect(() => {
     setForm(product || {
       codigo: '', nombre: '', presentacion: '', rubro: '', seccion: '',
-      precioLista: '', precioSinIva: '', precioConIva: '', descuento: 0, stock: ''
+      precioLista: '', precioSinIva: '', precioConIva: '', stock: ''
     });
     setError('');
   }, [product, open]);
@@ -233,16 +234,15 @@ function ProductDialog({ open, product, onClose, onSaved }) {
     try {
       const precioSinIva = parseNumber(form.precioSinIva);
       const precioConIva = parseNumber(form.precioConIva) || precioSinIva * (1 + IVA);
-      const descuento = normalizeDiscount(form.descuento);
       const producto = normalizeProduct({
         ...form,
         presentacion: normalizePresentation(form.presentacion),
         precioLista: parseNumber(form.precioLista) || precioSinIva,
         precioSinIva,
         precioConIva,
-        descuento,
-        precioSinIvaDescuento: descuento > 0 ? precioSinIva * (1 - descuento) : 0,
-        precioConIvaDescuento: descuento > 0 ? precioConIva * (1 - descuento) : 0,
+        descuento: 0,
+        precioSinIvaDescuento: 0,
+        precioConIvaDescuento: 0,
         stock: form.stock === '' ? null : parseNumber(form.stock)
       });
 
@@ -279,7 +279,6 @@ function ProductDialog({ open, product, onClose, onSaved }) {
             <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Precio de lista" type="number" value={form.precioLista ?? ''} onChange={(e) => change('precioLista', e.target.value)} /></Grid>
             <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Precio S/IVA" type="number" value={form.precioSinIva ?? ''} onChange={(e) => change('precioSinIva', e.target.value)} /></Grid>
             <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Precio C/IVA" type="number" value={form.precioConIva ?? ''} onChange={(e) => change('precioConIva', e.target.value)} /></Grid>
-            <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Descuento %" type="number" value={typeof form.descuento === 'number' ? Math.round(form.descuento * 100) : form.descuento || ''} onChange={(e) => change('descuento', e.target.value)} /></Grid>
           </Grid>
         </Stack>
       </DialogContent>
@@ -445,48 +444,61 @@ function ProductsView({ products, refresh }) {
 
 function ImportView({ products, refresh }) {
   const [file, setFile] = React.useState(null);
+  const [analysis, setAnalysis] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
+  const [publishing, setPublishing] = React.useState(false);
   const [message, setMessage] = React.useState(null);
 
-  const importar = async () => {
+  const selectFile = (nextFile) => {
+    setFile(nextFile || null);
+    setAnalysis(null);
+    setMessage(null);
+  };
+
+  const analizar = async () => {
     if (!file) return;
     setLoading(true);
     setMessage(null);
+    setAnalysis(null);
     try {
-      const incoming = await parseExcel(file, products);
-      const { error: disableError } = await supabase
-        .from('products')
-        .update({ activo: false, updated_at: new Date().toISOString() })
-        .eq('activo', true);
-      if (disableError) throw disableError;
-
-      for (const product of incoming) {
-        const row = toDatabase(product);
-        if (product.id) {
-          const { error } = await supabase.from('products').update(row).eq('id', product.id);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase.from('products').insert(row);
-          if (error) throw error;
-        }
-      }
-
-      await refresh();
-      setMessage({ type: 'success', text: `Lista actualizada correctamente. ${incoming.length.toLocaleString('es-AR')} productos procesados.` });
-      setFile(null);
+      const result = await parseExcel(file, products);
+      setAnalysis(result);
     } catch (err) {
-      setMessage({ type: 'error', text: err?.message || 'No se pudo importar el archivo.' });
+      setMessage({ type: 'error', text: err?.message || 'No se pudo analizar el archivo.' });
     } finally {
       setLoading(false);
     }
   };
+
+  const publicar = async () => {
+    if (!analysis?.products?.length) return;
+    setPublishing(true);
+    setMessage(null);
+    try {
+      const result = await replaceCatalogAtomic(analysis);
+      await refresh();
+      setMessage({
+        type: 'success',
+        text: `Lista publicada correctamente. ${Number(result?.products ?? analysis.summary.products).toLocaleString('es-AR')} productos y ${Number(result?.offers ?? analysis.summary.offers).toLocaleString('es-AR')} ofertas procesadas.`
+      });
+      setFile(null);
+      setAnalysis(null);
+    } catch (err) {
+      setMessage({ type: 'error', text: err?.message || 'No se pudo publicar la lista.' });
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const summary = analysis?.summary;
+  const warnings = analysis?.warnings || [];
 
   return (
     <Stack spacing={2.5}>
       <Box>
         <Typography variant="h5">Actualizar lista de precios</Typography>
         <Typography color="text.secondary" sx={{ mt: .5 }}>
-          Subí la nueva lista de POLCARFER. El sistema interpreta los productos, normaliza presentaciones y publica los cambios.
+          Primero analizamos el Excel. Recién después de revisar el resumen podés confirmar la publicación.
         </Typography>
       </Box>
 
@@ -510,61 +522,144 @@ function ImportView({ products, refresh }) {
           <Box>
             <Typography variant="h6">{file ? file.name : 'Seleccioná la nueva lista Excel'}</Typography>
             <Typography color="text.secondary" sx={{ mt: .5 }}>
-              Formatos admitidos: .xlsx y .xls · Los códigos repetidos están permitidos.
+              Admite el Excel original de POLCARFER y el formato exportado por el sistema.
             </Typography>
           </Box>
           <Button component="label" variant={file ? 'outlined' : 'contained'} startIcon={<UploadFileRoundedIcon />}>
             {file ? 'Cambiar archivo' : 'Seleccionar Excel'}
-            <input hidden type="file" accept=".xlsx,.xls" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            <input hidden type="file" accept=".xlsx,.xls" onChange={(e) => selectFile(e.target.files?.[0] || null)} />
           </Button>
+          {file && !analysis && (
+            <Button
+              size="large"
+              variant="contained"
+              disabled={loading}
+              onClick={analizar}
+            >
+              {loading ? 'Analizando…' : 'Analizar archivo'}
+            </Button>
+          )}
         </Stack>
       </Paper>
 
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 8 }}>
-          <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
-            <Typography fontWeight={800}>¿Qué va a hacer el sistema?</Typography>
-            <Stack spacing={1.1} sx={{ mt: 1.7 }}>
-              {[
-                'Actualizar los productos que ya existen.',
-                'Crear automáticamente los productos nuevos.',
-                'Identificar automáticamente cada producto, incluso cuando se repite el código.',
-                'Normalizar presentaciones simples como “12” → “12 unidades”.',
-                'Dejar fuera de la lista pública los productos que ya no aparecen.'
-              ].map((text) => (
-                <Stack key={text} direction="row" spacing={1} alignItems="flex-start">
-                  <CheckCircleRoundedIcon color="success" fontSize="small" sx={{ mt: .15 }} />
-                  <Typography variant="body2" color="text.secondary">{text}</Typography>
-                </Stack>
-              ))}
+      {summary && (
+        <>
+          <Alert severity={summary.priceConflicts || summary.orphanOffers ? 'warning' : 'success'} variant="outlined">
+            El precio base se toma únicamente de LISTA DE PRECIOS / SUPRABOND. La hoja LISTA CON DESCUENTOS crea ofertas separadas y nunca reemplaza el precio base.
+          </Alert>
+
+          <Grid container spacing={1.5}>
+            <Grid size={{ xs: 6, md: 2.4 }}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="caption" color="text.secondary">Productos</Typography>
+                <Typography variant="h5" sx={{ mt: .4 }}>{summary.products.toLocaleString('es-AR')}</Typography>
+              </Paper>
+            </Grid>
+            <Grid size={{ xs: 6, md: 2.4 }}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="caption" color="text.secondary">Ofertas</Typography>
+                <Typography variant="h5" sx={{ mt: .4 }}>{summary.offers.toLocaleString('es-AR')}</Typography>
+              </Paper>
+            </Grid>
+            <Grid size={{ xs: 6, md: 2.4 }}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="caption" color="text.secondary">Con varias ofertas</Typography>
+                <Typography variant="h5" sx={{ mt: .4 }}>{summary.multipleOffers.toLocaleString('es-AR')}</Typography>
+              </Paper>
+            </Grid>
+            <Grid size={{ xs: 6, md: 2.4 }}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="caption" color="text.secondary">Diferencias detectadas</Typography>
+                <Typography variant="h5" sx={{ mt: .4 }}>{summary.priceConflicts.toLocaleString('es-AR')}</Typography>
+              </Paper>
+            </Grid>
+            <Grid size={{ xs: 12, md: 2.4 }}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="caption" color="text.secondary">Precio a consultar</Typography>
+                <Typography variant="h5" sx={{ mt: .4 }}>{summary.zeroPrices.toLocaleString('es-AR')}</Typography>
+              </Paper>
+            </Grid>
+          </Grid>
+
+          {warnings.length > 0 && (
+            <Paper variant="outlined" sx={{ p: 2.2 }}>
+              <Typography fontWeight={850}>Revisión del archivo</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: .4, mb: 1.5 }}>
+                Estas diferencias no pisan el precio base. Se muestran para que el socio sepa exactamente qué detectó el sistema.
+              </Typography>
+              <Stack spacing={.8}>
+                {warnings.slice(0, 10).map((warning, index) => (
+                  <Alert key={`${warning.type}-${warning.codigo}-${index}`} severity={warning.type === 'price_conflict' ? 'warning' : 'info'} sx={{ py: .4 }}>
+                    {warning.message}
+                  </Alert>
+                ))}
+                {warnings.length > 10 && (
+                  <Typography variant="caption" color="text.secondary">
+                    + {warnings.length - 10} observaciones adicionales.
+                  </Typography>
+                )}
+              </Stack>
+            </Paper>
+          )}
+
+          <Paper variant="outlined" sx={{ p: 2.5, bgcolor: '#0b1621' }}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} gap={2}>
+              <Box>
+                <Typography fontWeight={850}>El archivo todavía no fue publicado</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: .35 }}>
+                  Confirmar ejecuta una sola transacción: si algo falla, Supabase revierte toda la actualización.
+                </Typography>
+              </Box>
+              <Stack direction={{ xs: 'column', sm: 'row' }} gap={1}>
+                <Button variant="outlined" onClick={() => setAnalysis(null)} disabled={publishing}>
+                  Volver a analizar
+                </Button>
+                <Button variant="contained" size="large" onClick={publicar} disabled={publishing}>
+                  {publishing ? 'Publicando…' : 'Confirmar y publicar'}
+                </Button>
+              </Stack>
             </Stack>
           </Paper>
+        </>
+      )}
+
+      {!analysis && (
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 8 }}>
+            <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+              <Typography fontWeight={800}>¿Qué va a hacer el sistema?</Typography>
+              <Stack spacing={1.1} sx={{ mt: 1.7 }}>
+                {[
+                  'Conservar el precio base exactamente como aparece en las hojas principales.',
+                  'Guardar cada descuento por cantidad como una oferta independiente.',
+                  'Mantener productos con precio 0 y mostrarlos como “Precio a consultar”.',
+                  'Detectar diferencias entre lista base y hoja de descuentos antes de publicar.',
+                  'Aplicar toda la actualización de forma atómica: completa o nada.'
+                ].map((text) => (
+                  <Stack key={text} direction="row" spacing={1} alignItems="flex-start">
+                    <CheckCircleRoundedIcon color="success" fontSize="small" sx={{ mt: .15 }} />
+                    <Typography variant="body2" color="text.secondary">{text}</Typography>
+                  </Stack>
+                ))}
+              </Stack>
+            </Paper>
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper variant="outlined" sx={{ p: 2.5, height: '100%', bgcolor: '#0b1621' }}>
+              <Typography variant="overline" color="text.secondary">CATÁLOGO ACTUAL</Typography>
+              <Typography variant="h4" sx={{ mt: .5 }}>{products.length.toLocaleString('es-AR')}</Typography>
+              <Typography color="text.secondary">productos publicados</Typography>
+            </Paper>
+          </Grid>
         </Grid>
-        <Grid size={{ xs: 12, md: 4 }}>
-          <Paper variant="outlined" sx={{ p: 2.5, height: '100%', bgcolor: '#0b1621' }}>
-            <Typography variant="overline" color="text.secondary">CATÁLOGO ACTUAL</Typography>
-            <Typography variant="h4" sx={{ mt: .5 }}>{products.length.toLocaleString('es-AR')}</Typography>
-            <Typography color="text.secondary">productos publicados</Typography>
-            <Button
-              fullWidth
-              size="large"
-              variant="contained"
-              disabled={!file || loading}
-              onClick={importar}
-              sx={{ mt: 2.5 }}
-            >
-              {loading ? 'Actualizando…' : 'Publicar nueva lista'}
-            </Button>
-          </Paper>
-        </Grid>
-      </Grid>
+      )}
 
       <Stack spacing={0.7} alignItems="flex-start">
         <Button variant="outlined" startIcon={<DownloadRoundedIcon />} onClick={() => exportAdminExcel(products)}>
           Descargar catálogo editable
         </Button>
         <Typography variant="caption" color="text.secondary">
-          Podés agregar filas nuevas normalmente. El sistema genera sus identificadores internos al importar.
+          El ID técnico sigue oculto. Las ofertas por cantidad se exportan en una hoja separada.
         </Typography>
       </Stack>
     </Stack>
@@ -880,7 +975,7 @@ function StatCard({ icon: Icon, label, value, helper }) {
 
 function Dashboard({ products, onNavigate }) {
   const rubros = React.useMemo(() => new Set(products.map((p) => p.rubro).filter(Boolean)).size, [products]);
-  const discounts = React.useMemo(() => products.filter((p) => p.tieneDescuento).length, [products]);
+  const discounts = React.useMemo(() => products.filter((p) => (p.offers || []).length > 0).length, [products]);
   const withStock = React.useMemo(() => products.filter((p) => p.stock !== null).length, [products]);
 
   return (

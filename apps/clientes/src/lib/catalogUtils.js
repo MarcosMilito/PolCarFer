@@ -133,8 +133,8 @@ export function normalizeProduct(p={}){
  };
 }
 
-export const finalSinIva=p=>p.tieneDescuento&&p.precioSinIvaDescuento>0?p.precioSinIvaDescuento:p.precioSinIva;
-export const finalConIva=p=>p.tieneDescuento&&p.precioConIvaDescuento>0?p.precioConIvaDescuento:p.precioConIva;
+export const finalSinIva=p=>Number(p?.precioSinIva||0);
+export const finalConIva=p=>Number(p?.precioConIva||0);
 export const formatPrice=v=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v)||0);
 export const formatDate=v=>v?new Intl.DateTimeFormat('es-AR',{dateStyle:'short',timeStyle:'short'}).format(new Date(v)):'—';
 
@@ -224,6 +224,14 @@ function findHeaderLayout(raw) {
       'TAMAÑO/UNIDADES',
       'TAMANO/UNIDADES'
     ]);
+    const condition = findHeaderInRow(row, [
+      'Oferta por bulto cerrado',
+      'OFERTA POR BULTO CERRADO',
+      'Condición',
+      'Condicion',
+      'Cantidad mínima',
+      'Cantidad minima'
+    ]);
 
     if (code >= 0 && name >= 0 && (list >= 0 || sin >= 0)) {
       return {
@@ -240,7 +248,8 @@ function findHeaderLayout(raw) {
         sin,
         con,
         bulk,
-        sizeUnits
+        sizeUnits,
+        condition
       };
     }
   }
@@ -449,7 +458,7 @@ function parseLegacyBaseSheet(XLSX, workbook, sheetName, config = {}) {
       continue;
     }
 
-    if (!code || !name || sinIva <= 0) continue;
+    if (!code || !name) continue;
 
     let presentation = '';
 
@@ -491,8 +500,49 @@ function parseLegacyBaseSheet(XLSX, workbook, sheetName, config = {}) {
   return rows;
 }
 
-function parseLegacyDiscounts(XLSX, workbook, sheetName) {
-  if (!sheetName) return { byExact: new Map(), byCode: new Map() };
+function parseMinimumQuantity(value = '') {
+  const text = String(value ?? '').trim();
+  if (!text) return null;
+  const match = text.match(/(\d+(?:[.,]\d+)?)/);
+  if (!match) return null;
+  const valueNumber = parseNumber(match[1]);
+  return valueNumber > 0 ? valueNumber : null;
+}
+
+export function normalizeOffer(o = {}) {
+  const descuento = normalizeDiscount(o.descuento ?? o.discount ?? 0);
+  const precioListaOrigen = Number(
+    o.precioListaOrigen ?? o.precio_lista_origen ?? o.listPrice ?? 0
+  ) || 0;
+  const precioSinIva = Number(
+    o.precioSinIva ?? o.precio_sin_iva ?? o.discountedSin ?? 0
+  ) || (descuento > 0 && precioListaOrigen > 0
+    ? precioListaOrigen * (1 - descuento)
+    : 0);
+  const precioConIva = Number(
+    o.precioConIva ?? o.precio_con_iva ?? o.discountedCon ?? 0
+  ) || (precioSinIva > 0 ? precioSinIva * (1 + IVA) : 0);
+
+  return {
+    id: o.id ? String(o.id) : null,
+    productId: o.productId ?? o.product_id ?? null,
+    productKey: String(o.productKey ?? o.product_key ?? ''),
+    codigo: String(o.codigo ?? '').trim(),
+    nombre: String(o.nombre ?? '').trim(),
+    condicion: String(o.condicion ?? o.condition ?? '').trim().replace(/\s+/g, ' '),
+    cantidadMinima: o.cantidadMinima ?? o.cantidad_minima ?? null,
+    descuento,
+    precioListaOrigen,
+    precioSinIva,
+    precioConIva,
+    requiereRevision: Boolean(o.requiereRevision ?? o.requiere_revision),
+    activa: o.activa !== false,
+    origen: String(o.origen || 'LISTA CON DESCUENTOS')
+  };
+}
+
+function parseLegacyOffers(XLSX, workbook, sheetName) {
+  if (!sheetName) return [];
 
   const raw = XLSX.utils.sheet_to_json(
     workbook.Sheets[sheetName],
@@ -500,84 +550,174 @@ function parseLegacyDiscounts(XLSX, workbook, sheetName) {
   );
   const layout = findHeaderLayout(raw);
 
-  if (!layout || layout.disc < 0 || layout.list < 0) {
-    return { byExact: new Map(), byCode: new Map() };
-  }
+  if (!layout || layout.disc < 0 || layout.list < 0) return [];
 
-  const byExact = new Map();
-  const byCode = new Map();
+  const offers = [];
 
   for (let index = layout.headerRow + 1; index < raw.length; index++) {
     const row = raw[index] || [];
-    const code = String(row[layout.code] ?? '').trim();
-    const name = String(row[layout.name] ?? '').trim();
-    const listPrice = numericCell(row[layout.list]);
+    const codigo = String(row[layout.code] ?? '').trim();
+    const nombre = String(row[layout.name] ?? '').trim();
 
-    if (!code || !name || listPrice <= 0) continue;
+    if (!codigo || !nombre) continue;
 
-    const discount = normalizeDiscount(row[layout.disc]);
-    const discountedSin =
-      layout.sin >= 0 ? numericCell(row[layout.sin]) : 0;
-    const discountedCon =
-      layout.con >= 0 ? numericCell(row[layout.con]) : 0;
+    const precioListaOrigen = numericCell(row[layout.list]);
+    const descuento = normalizeDiscount(row[layout.disc]);
+    const precioSinIvaCelda = layout.sin >= 0 ? numericCell(row[layout.sin]) : 0;
+    const precioConIvaCelda = layout.con >= 0 ? numericCell(row[layout.con]) : 0;
+    const condicion = layout.condition >= 0
+      ? String(row[layout.condition] ?? '').trim().replace(/\s+/g, ' ')
+      : '';
 
-    const info = {
-      listPrice,
-      discount,
-      discountedSin:
-        discountedSin ||
-        (discount > 0 ? listPrice * (1 - discount) : 0),
-      discountedCon:
-        discountedCon ||
-        (discount > 0
-          ? listPrice * (1 - discount) * (1 + IVA)
-          : 0)
-    };
+    // Una fila de la hoja de descuentos es una condición comercial independiente.
+    // Nunca reemplaza el precio base del producto.
+    if (descuento <= 0 && precioSinIvaCelda <= 0 && precioConIvaCelda <= 0) continue;
 
-    const exactKey = [code, name].map(normalizeText).join('|');
-    byExact.set(exactKey, info);
+    const precioSinIva = precioSinIvaCelda || (
+      descuento > 0 && precioListaOrigen > 0
+        ? precioListaOrigen * (1 - descuento)
+        : 0
+    );
+    const precioConIva = precioConIvaCelda || (
+      precioSinIva > 0 ? precioSinIva * (1 + IVA) : 0
+    );
 
-    const codeKey = normalizeText(code);
-    if (!byCode.has(codeKey)) byCode.set(codeKey, []);
-    byCode.get(codeKey).push({ name, info });
+    offers.push(normalizeOffer({
+      codigo,
+      nombre,
+      condicion,
+      cantidadMinima: parseMinimumQuantity(condicion),
+      descuento,
+      precioListaOrigen,
+      precioSinIva,
+      precioConIva,
+      origen: sheetName
+    }));
   }
 
-  return { byExact, byCode };
+  return offers;
 }
 
-function applyLegacyDiscount(product, discountMaps) {
-  const exactKey = [product.codigo, product.nombre]
-    .map(normalizeText)
-    .join('|');
+function matchLegacyOffers(products, rawOffers) {
+  const byCodeName = new Map();
+  const byCode = new Map();
 
-  let discountInfo = discountMaps.byExact.get(exactKey);
+  const add = (map, key, product) => {
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(product);
+  };
 
-  if (!discountInfo) {
-    const candidates = discountMaps.byCode.get(
-      normalizeText(product.codigo)
-    ) || [];
+  for (const product of products) {
+    add(
+      byCodeName,
+      [product.codigo, product.nombre].map(normalizeText).join('|'),
+      product
+    );
+    add(byCode, normalizeText(product.codigo), product);
+  }
 
-    if (candidates.length === 1) {
-      discountInfo = candidates[0].info;
+  const offers = [];
+  const warnings = [];
+
+  for (const rawOffer of rawOffers) {
+    const exactKey = [rawOffer.codigo, rawOffer.nombre]
+      .map(normalizeText)
+      .join('|');
+
+    let candidates = byCodeName.get(exactKey) || [];
+
+    if (candidates.length === 0) {
+      const byCodeCandidates = byCode.get(normalizeText(rawOffer.codigo)) || [];
+      if (byCodeCandidates.length === 1) candidates = byCodeCandidates;
+    }
+
+    if (candidates.length !== 1) {
+      warnings.push({
+        type: candidates.length ? 'ambiguous_offer' : 'orphan_offer',
+        codigo: rawOffer.codigo,
+        nombre: rawOffer.nombre,
+        message: candidates.length
+          ? `La oferta ${rawOffer.codigo} coincide con más de un producto y no se vinculó automáticamente.`
+          : `La oferta ${rawOffer.codigo} no tiene un producto base equivalente y no se importará.`
+      });
+      continue;
+    }
+
+    const product = candidates[0];
+    const basePrice = Number(product.precioSinIva || 0);
+    const sourcePrice = Number(rawOffer.precioListaOrigen || 0);
+    const priceConflict = basePrice > 0 && sourcePrice > 0 && Math.abs(basePrice - sourcePrice) > 0.01;
+
+    const offer = normalizeOffer({
+      ...rawOffer,
+      productId: product.id || null,
+      productKey: productIdentityKey(product),
+      requiereRevision: priceConflict
+    });
+
+    offers.push(offer);
+
+    if (priceConflict) {
+      warnings.push({
+        type: 'price_conflict',
+        codigo: product.codigo,
+        nombre: product.nombre,
+        basePrice,
+        offerListPrice: sourcePrice,
+        message: `${product.codigo}: la lista base indica ${formatPrice(basePrice)} S/IVA y la hoja de descuentos usa ${formatPrice(sourcePrice)}. El precio base NO será reemplazado.`
+      });
     }
   }
 
-  if (!discountInfo) return product;
+  const offerCountByProduct = new Map();
+  for (const offer of offers) {
+    offerCountByProduct.set(
+      offer.productKey,
+      (offerCountByProduct.get(offer.productKey) || 0) + 1
+    );
+  }
 
-  const listPrice = discountInfo.listPrice || product.precioSinIva;
-  const discount = discountInfo.discount;
+  return {
+    offers,
+    warnings,
+    multipleOffers: [...offerCountByProduct.values()].filter((count) => count > 1).length
+  };
+}
 
+function baseOnlyProduct(product) {
   return normalizeProduct({
     ...product,
-    precioLista: listPrice,
-    precioSinIva: listPrice,
-    precioConIva: listPrice * (1 + IVA),
-    descuento: discount,
-    precioSinIvaDescuento:
-      discount > 0 ? discountInfo.discountedSin : 0,
-    precioConIvaDescuento:
-      discount > 0 ? discountInfo.discountedCon : 0
+    descuento: 0,
+    precioSinIvaDescuento: 0,
+    precioConIvaDescuento: 0
   });
+}
+
+function buildAnalysis(products, offers = [], warnings = [], format = 'generic') {
+  const cleanProducts = products.map(baseOnlyProduct);
+  const cleanOffers = offers.map(normalizeOffer);
+
+  return {
+    products: cleanProducts,
+    offers: cleanOffers,
+    warnings,
+    format,
+    summary: {
+      products: cleanProducts.length,
+      offers: cleanOffers.length,
+      multipleOffers: (() => {
+        const counts = new Map();
+        for (const offer of cleanOffers) {
+          counts.set(offer.productKey, (counts.get(offer.productKey) || 0) + 1);
+        }
+        return [...counts.values()].filter((count) => count > 1).length;
+      })(),
+      priceConflicts: cleanOffers.filter((offer) => offer.requiereRevision).length,
+      zeroPrices: cleanProducts.filter((product) => Number(product.precioSinIva || 0) <= 0).length,
+      orphanOffers: warnings.filter((warning) => warning.type === 'orphan_offer').length,
+      ambiguousOffers: warnings.filter((warning) => warning.type === 'ambiguous_offer').length
+    }
+  };
 }
 
 function parseLegacyPolcarferWorkbook(XLSX, workbook, currentProducts) {
@@ -601,17 +741,17 @@ function parseLegacyPolcarferWorkbook(XLSX, workbook, currentProducts) {
 
   if (!baseRows.length) return null;
 
-  const discounts = parseLegacyDiscounts(
-    XLSX,
-    workbook,
-    discountSheet
-  );
+  const products = attachExistingIds(baseRows, currentProducts)
+    .map(baseOnlyProduct);
+  const rawOffers = parseLegacyOffers(XLSX, workbook, discountSheet);
+  const matched = matchLegacyOffers(products, rawOffers);
 
-  const merged = baseRows.map((product) =>
-    applyLegacyDiscount(product, discounts)
+  return buildAnalysis(
+    products,
+    matched.offers,
+    matched.warnings,
+    'polcarfer_legacy'
   );
-
-  return attachExistingIds(merged, currentProducts);
 }
 
 function findBestGenericSheet(XLSX, workbook) {
@@ -675,8 +815,6 @@ function parseGenericRows(raw, layout, currentProducts) {
       layout.sin >= 0
         ? numericCell(row[layout.sin])
         : listPrice;
-
-    if (listPrice <= 0 && sinCell <= 0) continue;
 
     const baseSin =
       discount > 0 &&
@@ -742,8 +880,9 @@ export async function parseExcel(file, currentProducts = []) {
    * - SUPRABOND-BULIT-SOMERSET
    * - LISTA CON DESCUENTOS
    *
-   * Se unen automáticamente las 2 hojas de productos y se
-   * superponen los descuentos de la tercera.
+   * Las primeras dos hojas son la ÚNICA fuente del precio base.
+   * La hoja de descuentos crea ofertas independientes y nunca pisa
+   * precio_lista / precio_sin_iva / precio_con_iva del producto.
    */
   const legacy = parseLegacyPolcarferWorkbook(
     XLSX,
@@ -751,13 +890,8 @@ export async function parseExcel(file, currentProducts = []) {
     currentProducts
   );
 
-  if (legacy?.length) return legacy;
+  if (legacy?.products?.length) return legacy;
 
-  /*
-   * Formato editable exportado por el sistema o planillas
-   * similares. El encabezado puede estar dentro de las
-   * primeras 80 filas y acepta DETALLE, LISTA, S/IVA, C/IVA.
-   */
   const generic = findBestGenericSheet(XLSX, workbook);
 
   if (!generic) {
@@ -774,23 +908,123 @@ export async function parseExcel(file, currentProducts = []) {
 
   if (!rows.length) {
     throw new Error(
-      'Encontré los encabezados, pero no detecté productos con código, descripción y precio.'
+      'Encontré los encabezados, pero no detecté productos con código y descripción.'
     );
   }
 
-  return rows;
+  const offers = [];
+  const products = rows.map((row) => {
+    if (row.descuento > 0) {
+      offers.push(normalizeOffer({
+        productId: row.id || null,
+        productKey: productIdentityKey(row),
+        codigo: row.codigo,
+        nombre: row.nombre,
+        condicion: '',
+        cantidadMinima: null,
+        descuento: row.descuento,
+        precioListaOrigen: row.precioLista || row.precioSinIva,
+        precioSinIva: row.precioSinIvaDescuento,
+        precioConIva: row.precioConIvaDescuento,
+        origen: 'IMPORTADO EXCEL'
+      }));
+    }
+    return baseOnlyProduct(row);
+  });
+
+  return buildAnalysis(products, offers, [], 'generic');
+}
+
+export function offersForQuantity(product, quantity = 1) {
+  const qty = Math.max(1, Number(quantity) || 1);
+  return (product?.offers || [])
+    .map(normalizeOffer)
+    .filter((offer) =>
+      offer.activa !== false &&
+      (offer.cantidadMinima === null ||
+        offer.cantidadMinima === undefined ||
+        qty >= Number(offer.cantidadMinima || 0))
+    );
+}
+
+export function priceForQuantity(product, quantity = 1, includeVat = true) {
+  const base = Number(
+    includeVat ? product?.precioConIva : product?.precioSinIva
+  ) || 0;
+  const eligible = offersForQuantity(product, quantity);
+
+  if (!eligible.length) return base;
+
+  const offerPrices = eligible
+    .map((offer) => Number(includeVat ? offer.precioConIva : offer.precioSinIva) || 0)
+    .filter((price) => price > 0);
+
+  if (!offerPrices.length) return base;
+  if (base <= 0) return Math.min(...offerPrices);
+  return Math.min(base, ...offerPrices);
+}
+
+function appendOffersSheet(XLSX, workbook, products) {
+  const offerRows = products.flatMap((product) =>
+    (product.offers || []).map((offerRaw) => {
+      const offer = normalizeOffer(offerRaw);
+      return {
+        'Código': product.codigo,
+        'Producto': product.nombre,
+        'Condición': offer.condicion || 'Oferta general',
+        'Cantidad mínima': offer.cantidadMinima ?? '',
+        'Descuento': Number(offer.descuento || 0),
+        'Precio lista origen': Number(offer.precioListaOrigen || 0),
+        'Precio oferta S/IVA': Number(offer.precioSinIva || 0),
+        'Precio oferta C/IVA': Number(offer.precioConIva || 0)
+      };
+    })
+  );
+
+  if (!offerRows.length) return;
+
+  const offersSheet = XLSX.utils.json_to_sheet(offerRows);
+  offersSheet['!cols'] = [
+    { wch: 16 },
+    { wch: 55 },
+    { wch: 34 },
+    { wch: 16 },
+    { wch: 14 },
+    { wch: 20 },
+    { wch: 21 },
+    { wch: 21 }
+  ];
+
+  if (offersSheet['!ref']) {
+    offersSheet['!autofilter'] = { ref: offersSheet['!ref'] };
+    const range = XLSX.utils.decode_range(offersSheet['!ref']);
+    for (let row = 1; row <= range.e.r; row++) {
+      const descuento = offersSheet[XLSX.utils.encode_cell({ r: row, c: 4 })];
+      if (descuento) descuento.z = '0%';
+      for (const col of [5, 6, 7]) {
+        const cell = offersSheet[XLSX.utils.encode_cell({ r: row, c: col })];
+        if (cell) cell.z = '$ #,##0.00';
+      }
+    }
+  }
+
+  XLSX.utils.book_append_sheet(workbook, offersSheet, 'Ofertas');
 }
 
 export async function exportExcel(products, filename = 'POLCARFER - Lista de Precios.xlsx') {
   const XLSX = await loadXlsx();
+
+  // La primera hoja conserva EXACTAMENTE las 7 columnas comerciales acordadas.
+  // Muestra el precio base oficial. Las ofertas por cantidad se detallan en
+  // una segunda hoja para no convertir una condición de volumen en un precio general.
   const rows = products.map((p) => ({
     'Código': p.codigo,
     'Producto': p.nombre,
     'Presentación': normalizePresentation(p.presentacion),
-    'Precio de lista': Number(p.precioLista || 0),
-    'Descuento': Number(p.descuento || 0),
-    'Precio S/IVA': Number(finalSinIva(p) || 0),
-    'Precio C/IVA': Number(finalConIva(p) || 0)
+    'Precio de lista': Number(p.precioLista || p.precioSinIva || 0),
+    'Descuento': 0,
+    'Precio S/IVA': Number(p.precioSinIva || 0),
+    'Precio C/IVA': Number(p.precioConIva || 0)
   }));
 
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -821,20 +1055,13 @@ export async function exportExcel(products, filename = 'POLCARFER - Lista de Pre
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Lista de Precios');
+  appendOffersSheet(XLSX, wb, products);
   XLSX.writeFile(wb, filename);
 }
 
 export async function exportAdminExcel(products, filename = 'POLCARFER - Catalogo Editable.xlsx') {
   const XLSX = await loadXlsx();
-  /*
-   * El ID interno se exporta en la primera columna, pero queda OCULTO.
-   * El socio no tiene que verlo, completarlo ni modificarlo.
-   *
-   * - Producto existente: conserva su UUID oculto y se actualiza exactamente.
-   * - Fila nueva: ID vacío -> Supabase genera el UUID automáticamente al importar.
-   * - Excel externo sin ID: parseExcel usa Código + Producto + Presentación
-   *   y solo cae al código cuando no existe ambigüedad.
-   */
+
   const rows = products.map((p) => ({
     'ID Sistema': p.id || '',
     'Código': p.codigo,
@@ -843,15 +1070,13 @@ export async function exportAdminExcel(products, filename = 'POLCARFER - Catalog
     'Rubro': p.rubro,
     'Sección': p.seccion,
     'Stock': p.stock ?? '',
-    'Precio de lista': Number(p.precioLista || 0),
-    'Descuento': Number(p.descuento || 0),
-    'Precio S/IVA': Number(finalSinIva(p) || 0),
-    'Precio C/IVA': Number(finalConIva(p) || 0)
+    'Precio de lista': Number(p.precioLista || p.precioSinIva || 0),
+    'Descuento': 0,
+    'Precio S/IVA': Number(p.precioSinIva || 0),
+    'Precio C/IVA': Number(p.precioConIva || 0)
   }));
 
   const ws = XLSX.utils.json_to_sheet(rows);
-
-  // La columna A contiene el ID técnico y se oculta para el usuario.
   ws['!cols'] = [
     { wch: 38, hidden: true },
     { wch: 16 },
@@ -868,15 +1093,12 @@ export async function exportAdminExcel(products, filename = 'POLCARFER - Catalog
 
   if (ws['!ref']) {
     ws['!autofilter'] = { ref: ws['!ref'] };
-
-    // Formato numérico. A está oculta, por lo que las columnas visibles empiezan en B.
     const range = XLSX.utils.decode_range(ws['!ref']);
     for (let row = 1; row <= range.e.r; row++) {
       const precioLista = ws[XLSX.utils.encode_cell({ r: row, c: 7 })];
       const descuento = ws[XLSX.utils.encode_cell({ r: row, c: 8 })];
       const sinIva = ws[XLSX.utils.encode_cell({ r: row, c: 9 })];
       const conIva = ws[XLSX.utils.encode_cell({ r: row, c: 10 })];
-
       if (precioLista) precioLista.z = '$ #,##0.00';
       if (descuento) descuento.z = '0%';
       if (sinIva) sinIva.z = '$ #,##0.00';
@@ -886,6 +1108,7 @@ export async function exportAdminExcel(products, filename = 'POLCARFER - Catalog
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Lista de Precios');
+  appendOffersSheet(XLSX, wb, products);
   XLSX.writeFile(wb, filename);
 }
 

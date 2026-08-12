@@ -31,7 +31,11 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
-import { CONTACT, finalConIva, formatPrice, normalizeText } from '../lib/catalogUtils.js';
+import { CONTACT, formatPrice, normalizeText } from '../lib/catalogUtils.js';
+
+function commercialPrice(value) {
+  return Number(value || 0) > 0 ? formatPrice(value) : 'A consultar';
+}
 
 function CartContent({ cart, setCart, units, total, onCheckout, mobile = false, onClose }) {
   return (
@@ -62,7 +66,8 @@ function CartContent({ cart, setCart, units, total, onCheckout, mobile = false, 
             {cart.map((item) => (
               <Paper key={item.id} variant="outlined" sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,.012)' }}>
                 <Typography fontWeight={750} sx={{ lineHeight: 1.3 }}>{item.nombre}</Typography>
-                <Typography variant="caption" color="text.secondary">{item.codigo} · {formatPrice(item.precio)} c/u</Typography>
+                <Typography variant="caption" color="text.secondary">{item.codigo} · {commercialPrice(item.precio)} c/u</Typography>
+                {item.ofertasDisponibles > 0 && <Chip label={`${item.ofertasDisponibles} oferta${item.ofertasDisponibles === 1 ? '' : 's'} disponible${item.ofertasDisponibles === 1 ? '' : 's'}`} size="small" color="success" sx={{ mt: .7 }} />}
                 <Stack direction="row" alignItems="center" spacing={.4} sx={{ mt: 1.1 }}>
                   <IconButton
                     aria-label="Restar unidad"
@@ -80,7 +85,7 @@ function CartContent({ cart, setCart, units, total, onCheckout, mobile = false, 
                     <AddRoundedIcon fontSize="small" />
                   </IconButton>
                   <Box sx={{ flex: 1 }} />
-                  <Typography fontWeight={850}>{formatPrice(item.precio * item.cantidad)}</Typography>
+                  <Typography fontWeight={850}>{item.precio > 0 ? formatPrice(item.precio * item.cantidad) : 'A consultar'}</Typography>
                   <IconButton
                     aria-label="Quitar producto"
                     color="error"
@@ -157,16 +162,34 @@ export default function OrdersView({ products, cart, setCart }) {
           nombre: p.nombre,
           presentacion: p.presentacion,
           cantidad: 1,
-          precio: finalConIva(p)
+          precio: Number(p.precioConIva || 0)
         }];
   });
 
-  const units = cart.reduce((sum, item) => sum + item.cantidad, 0);
-  const total = cart.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
+  const productMap = React.useMemo(
+    () => new Map(products.map((product) => [product.id || `${product.codigo}|${product.nombre}|${product.presentacion}`, product])),
+    [products]
+  );
+
+  const pricedCart = React.useMemo(
+    () => cart.map((item) => {
+      const product = productMap.get(item.id);
+      if (!product) return item;
+      return {
+        ...item,
+        precio: Number(product.precioConIva || 0),
+        ofertasDisponibles: (product.offers || []).length
+      };
+    }),
+    [cart, productMap]
+  );
+
+  const units = pricedCart.reduce((sum, item) => sum + item.cantidad, 0);
+  const total = pricedCart.reduce((sum, item) => sum + (Number(item.precio || 0) * item.cantidad), 0);
 
   const send = () => {
-    const lines = cart
-      .map((item) => `${item.codigo} - ${item.nombre} | Cant: ${item.cantidad} | ${formatPrice(item.precio * item.cantidad)}`)
+    const lines = pricedCart
+      .map((item) => `${item.codigo} - ${item.nombre} | Cant: ${item.cantidad} | ${item.precio > 0 ? formatPrice(item.precio * item.cantidad) : 'Precio a consultar'}${item.ofertasDisponibles > 0 ? ` | ${item.ofertasDisponibles} oferta(s) disponible(s), confirmar condición` : ''}`)
       .join('\n');
 
     const msg = `Hola POLCARFER, quiero solicitar este pedido.\n\nCliente: ${customer.nombre}\nTeléfono: ${customer.telefono}\nLocalidad: ${customer.localidad}\n\nPRODUCTOS\n${lines}\n\nTotal estimado c/IVA: ${formatPrice(total)}\n\nPor favor confirmar disponibilidad, precio vigente y entrega.`;
@@ -246,6 +269,7 @@ export default function OrdersView({ products, cart, setCart }) {
                           <Chip label={p.codigo} size="small" variant="outlined" sx={{ fontFamily: 'monospace' }} />
                           {inCart && <Chip label={`${inCart.cantidad} en pedido`} size="small" color="primary" />}
                           {noStock && <Chip label="Sin stock" size="small" color="error" variant="outlined" />}
+                          {(p.offers || []).length > 0 && <Chip label={`${p.offers.length} oferta${p.offers.length === 1 ? '' : 's'} por cantidad`} size="small" color="success" variant="outlined" />}
                         </Stack>
                         <Typography fontWeight={820} sx={{ mt: .75, lineHeight: 1.35 }}>{p.nombre}</Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: .35, lineHeight: 1.45 }}>
@@ -262,7 +286,7 @@ export default function OrdersView({ products, cart, setCart }) {
                       >
                         <Box>
                           <Typography variant="caption" color="text.secondary">Precio c/IVA</Typography>
-                          <Typography variant="h6" color="primary.light">{formatPrice(finalConIva(p))}</Typography>
+                          <Typography variant="h6" color="primary.light">{commercialPrice(p.precioConIva)}</Typography>
                         </Box>
                         {mobile && (
                           <Button
@@ -299,7 +323,7 @@ export default function OrdersView({ products, cart, setCart }) {
         {!mobile && (
           <Grid size={{ xs: 12, lg: 3.7 }}>
             <Paper variant="outlined" sx={{ p: 2.5, position: { lg: 'sticky' }, top: { lg: 92 }, bgcolor: '#0b1621' }}>
-              <CartContent cart={cart} setCart={setCart} units={units} total={total} onCheckout={openCheckout} />
+              <CartContent cart={pricedCart} setCart={setCart} units={units} total={total} onCheckout={openCheckout} />
             </Paper>
           </Grid>
         )}
@@ -349,7 +373,7 @@ export default function OrdersView({ products, cart, setCart }) {
         }}
       >
         <CartContent
-          cart={cart}
+          cart={pricedCart}
           setCart={setCart}
           units={units}
           total={total}
